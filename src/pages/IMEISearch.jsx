@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, or } from 'firebase/firestore';
 import { 
@@ -35,6 +36,7 @@ export default function IMEISearch() {
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const inputRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (inputRef.current) inputRef.current.focus();
@@ -88,6 +90,11 @@ export default function IMEISearch() {
     setSupplier(null);
     setHasSearched(false);
     if (inputRef.current) inputRef.current.focus();
+  };
+
+  const handleSellClick = () => {
+    if (!device) return;
+    navigate('/sales', { state: { scanCode: device.imei1 || device.imei } });
   };
 
   return (
@@ -254,7 +261,10 @@ export default function IMEISearch() {
 
                 {/* Quick Actions */}
                 <div className="space-y-3">
-                  <button className="btn-primary w-full py-4 flex items-center justify-center gap-2 text-lg shadow-xl shadow-primary-600/20">
+                  <button 
+                    onClick={handleSellClick}
+                    className="btn-primary w-full py-4 flex items-center justify-center gap-2 text-lg shadow-xl shadow-primary-600/20"
+                  >
                     <Tag className="w-5 h-5" />
                     Sell This Device
                   </button>

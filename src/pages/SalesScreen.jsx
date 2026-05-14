@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, updateDoc, addDoc, or, runTransaction } from 'firebase/firestore';
 import { 
@@ -42,14 +43,24 @@ export default function SalesScreen() {
   const [searchingAccessories, setSearchingAccessories] = useState(false);
 
   const inputRef = useRef(null);
+  const location = useLocation();
 
   useEffect(() => {
     if (inputRef.current) inputRef.current.focus();
-  }, []);
+    
+    // Auto-scan if coming from IMEI Search
+    if (location.state?.scanCode) {
+      setScanValue(location.state.scanCode);
+      // We need a small delay to ensure state is set before searching
+      setTimeout(() => {
+        handleSearch(null, location.state.scanCode);
+      }, 100);
+    }
+  }, [location.state]);
 
-  const handleSearch = async (e) => {
+  const handleSearch = async (e, forceVal = null) => {
     if (e) e.preventDefault();
-    const val = scanValue.trim();
+    const val = forceVal || scanValue.trim();
     if (!val) return;
 
     try {
@@ -62,13 +73,20 @@ export default function SalesScreen() {
           where('imei1', '==', val),
           where('imei2', '==', val),
           where('imei', '==', val)
-        ),
-        where('status', '==', 'Available')
+        )
       );
       const mobileSnap = await getDocs(qMobile);
 
       if (!mobileSnap.empty) {
-        const data = { id: mobileSnap.docs[0].id, ...mobileSnap.docs[0].data(), type: 'mobile' };
+        const mobileDoc = mobileSnap.docs[0];
+        const data = { id: mobileDoc.id, ...mobileDoc.data(), type: 'mobile' };
+        
+        if (data.status !== 'Available') {
+          toast.error(`Device is already ${data.status}`);
+          setSearching(false);
+          return;
+        }
+
         // Check if already in cart
         if (cart.find(item => item.id === data.id)) {
           toast.error("Mobile already in cart");
