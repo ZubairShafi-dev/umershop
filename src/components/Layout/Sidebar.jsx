@@ -10,7 +10,8 @@ import {
   Users, 
   BarChart3, 
   Settings,
-  Package 
+  Package,
+  Scan
 } from 'lucide-react';
 
 export default function Sidebar({ isOpen, onClose }) {

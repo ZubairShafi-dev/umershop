@@ -75,7 +75,7 @@ export default function Accessories() {
   // Printing logic
   const printRef = useRef();
   const handlePrint = useReactToPrint({
-    content: () => printRef.current,
+    contentRef: printRef,
   });
   const [itemToPrint, setItemToPrint] = useState(null);
 
