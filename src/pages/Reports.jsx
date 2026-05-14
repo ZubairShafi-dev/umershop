@@ -13,7 +13,9 @@ import {
   Loader2,
   Smartphone,
   ChevronDown,
-  PieChart as PieIcon
+  PieChart as PieIcon,
+  CreditCard,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -28,7 +30,9 @@ import {
   Legend,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  AreaChart, 
+  Area
 } from 'recharts';
 
 const COLORS = ['#14b8a6', '#f59e0b', '#3b82f6', '#ec4899'];
@@ -289,6 +293,3 @@ export default function Reports() {
     </div>
   );
 }
-
-// Importing AreaChart specifically
-import { AreaChart, Area } from 'recharts';
