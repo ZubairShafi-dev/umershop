@@ -19,7 +19,8 @@ import {
   Plus,
   Minus,
   Search,
-  Trash2
+  Trash2,
+  Barcode as BarcodeIcon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';

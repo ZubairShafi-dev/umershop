@@ -19,12 +19,12 @@ export default function Sidebar({ isOpen, onClose }) {
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Add Mobile', path: '/add-mobile', icon: PlusCircle },
+    { name: 'Accessories', path: '/accessories', icon: Package },
     { name: 'Inventory', path: '/inventory', icon: Smartphone },
-    { name: 'IMEI Search', path: '/search', icon: Search },
+    { name: 'IMEI Search', path: '/search', icon: Scan },
     { name: 'Sales', path: '/sales', icon: ShoppingCart },
     { name: 'Suppliers', path: '/suppliers', icon: Users },
     { name: 'Reports', path: '/reports', icon: BarChart3 },
-    { name: 'Accessories', path: '/accessories', icon: Package },
     { name: 'Settings', path: '/settings', icon: Settings },
   ];
 
