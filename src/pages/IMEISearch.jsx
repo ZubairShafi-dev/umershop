@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, or } from 'firebase/firestore';
 import { 
   Search, 
   Smartphone, 
@@ -50,7 +50,14 @@ export default function IMEISearch() {
       setDevice(null);
       setSupplier(null);
 
-      const q = query(collection(db, 'mobiles'), where('imei', '==', imei.trim()));
+      const q = query(
+        collection(db, 'mobiles'), 
+        or(
+          where('imei1', '==', imei.trim()),
+          where('imei2', '==', imei.trim()),
+          where('imei', '==', imei.trim())
+        )
+      );
       const querySnapshot = await getDocs(q);
 
       if (!querySnapshot.empty) {
@@ -150,7 +157,12 @@ export default function IMEISearch() {
                       </div>
                       <div>
                         <h2 className="text-2xl font-bold text-white">{device.brand} {device.model}</h2>
-                        <p className="text-slate-500 font-mono tracking-tighter">{device.ramStorage} · {device.color}</p>
+                        <p className="text-slate-500 font-mono tracking-tighter">
+                          {device.ramStorage} · {device.color}
+                        </p>
+                        <p className="text-[10px] text-primary-500 font-mono mt-1">
+                          {device.imei1 || device.imei} {device.imei2 ? `· ${device.imei2}` : ''}
+                        </p>
                       </div>
                     </div>
                     <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-sm font-bold border ${STATUS_COLORS[device.status]}`}>

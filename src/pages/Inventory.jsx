@@ -67,7 +67,9 @@ export default function Inventory() {
 
   const filteredMobiles = mobiles.filter(m => {
     const matchesSearch = 
-      m.imei.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (m.imei1 && m.imei1.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (m.imei2 && m.imei2.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (m.imei && m.imei.toLowerCase().includes(searchQuery.toLowerCase())) || // backward compatibility
       m.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
       m.model.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || m.status === statusFilter;
@@ -137,7 +139,12 @@ export default function Inventory() {
                       <div className="text-sm font-bold text-white">{mobile.brand} {mobile.model}</div>
                       <div className="text-[10px] text-slate-500 uppercase tracking-tight">{mobile.ramStorage} · {mobile.color}</div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-400 font-mono">{mobile.imei}</td>
+                    <td className="px-6 py-4 text-sm text-slate-400 font-mono">
+                      <div className="flex flex-col gap-0.5">
+                        <span>{mobile.imei1 || mobile.imei}</span>
+                        {mobile.imei2 && <span className="text-[10px] opacity-60">SIM2: {mobile.imei2}</span>}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 text-sm text-white font-medium">Rs. {mobile.sellingPrice.toLocaleString()}</td>
                     <td className="px-6 py-4 text-xs text-slate-400">{suppliers[mobile.supplierId] || '...'}</td>
                     <td className="px-6 py-4">
@@ -165,7 +172,14 @@ export default function Inventory() {
             </div>
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><p className="text-slate-500 text-xs font-bold uppercase mb-1">IMEI</p><p className="text-white font-mono">{selectedMobile.imei}</p></div>
+                <div>
+                  <p className="text-slate-500 text-xs font-bold uppercase mb-1">IMEI 1</p>
+                  <p className="text-white font-mono">{selectedMobile.imei1 || selectedMobile.imei}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500 text-xs font-bold uppercase mb-1">IMEI 2</p>
+                  <p className="text-white font-mono">{selectedMobile.imei2 || '-'}</p>
+                </div>
                 <div><p className="text-slate-500 text-xs font-bold uppercase mb-1">Color</p><p className="text-white">{selectedMobile.color}</p></div>
                 <div><p className="text-slate-500 text-xs font-bold uppercase mb-1">Cost Price</p><p className="text-white font-medium">Rs. {selectedMobile.purchasePrice.toLocaleString()}</p></div>
                 <div><p className="text-slate-500 text-xs font-bold uppercase mb-1">Selling Price</p><p className="text-primary-400 font-bold">Rs. {selectedMobile.sellingPrice.toLocaleString()}</p></div>

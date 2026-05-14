@@ -40,10 +40,12 @@ export default function AddMobile() {
   const [modelQuery, setModelQuery] = useState('');
   const [supplierQuery, setSupplierQuery] = useState('');
   
-  const imeiInputRef = useRef(null);
+  const imei1InputRef = useRef(null);
+  const imei2InputRef = useRef(null);
   
   const initialFormState = {
-    imei: '',
+    imei1: '',
+    imei2: '',
     brand: '',
     model: '',
     ramStorage: '',
@@ -68,7 +70,7 @@ export default function AddMobile() {
       setLoadingSuppliers(false);
     });
 
-    if (imeiInputRef.current) imeiInputRef.current.focus();
+    if (imei1InputRef.current) imei1InputRef.current.focus();
     return () => unsubscribe();
   }, []);
 
@@ -109,7 +111,7 @@ export default function AddMobile() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.imei || !formData.brand || !formData.model || !formData.purchasePrice || !formData.supplierId) {
+    if (!formData.imei1 || !formData.brand || !formData.model || !formData.purchasePrice || !formData.supplierId) {
       toast.error("Please fill all required fields");
       return;
     }
@@ -127,7 +129,7 @@ export default function AddMobile() {
       setBrandQuery('');
       setModelQuery('');
       setSupplierQuery('');
-      if (imeiInputRef.current) imeiInputRef.current.focus();
+      if (imei1InputRef.current) imei1InputRef.current.focus();
     } catch (error) {
       toast.error("Failed to add mobile");
     } finally {
@@ -152,18 +154,38 @@ export default function AddMobile() {
             <Scan className="w-5 h-5 text-primary-400" />
             <h2 className="text-lg font-bold text-white">IMEI Scanner</h2>
           </div>
-          <div className="relative">
-            <input
-              ref={imeiInputRef}
-              type="text"
-              name="imei"
-              required
-              placeholder="Scan IMEI with barcode scanner..."
-              className="input-field pl-12 text-lg font-mono tracking-widest border-primary-500/50 focus:ring-primary-500/50"
-              value={formData.imei}
-              onChange={handleInputChange}
-            />
-            <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-primary-500" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="relative">
+              <input
+                ref={imei1InputRef}
+                type="text"
+                name="imei1"
+                required
+                placeholder="IMEI 1 (Primary)"
+                className="input-field pl-12 text-lg font-mono tracking-widest border-primary-500/50 focus:ring-primary-500/50"
+                value={formData.imei1}
+                onChange={(e) => {
+                  handleInputChange(e);
+                  // Auto focus IMEI 2 after 15 chars (standard IMEI length)
+                  if (e.target.value.length >= 15) {
+                    imei2InputRef.current?.focus();
+                  }
+                }}
+              />
+              <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-primary-500" />
+            </div>
+            <div className="relative">
+              <input
+                ref={imei2InputRef}
+                type="text"
+                name="imei2"
+                placeholder="IMEI 2 (Optional)"
+                className="input-field pl-12 text-lg font-mono tracking-widest border-slate-700"
+                value={formData.imei2}
+                onChange={handleInputChange}
+              />
+              <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-500" />
+            </div>
           </div>
         </div>
 

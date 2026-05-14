@@ -14,6 +14,7 @@ import IMEISearch from './pages/IMEISearch';
 import SalesScreen from './pages/SalesScreen';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import Accessories from './pages/Accessories';
 
 function App() {
   return (
@@ -57,6 +58,7 @@ function App() {
             <Route path="sales" element={<SalesScreen />} />
             <Route path="suppliers" element={<Suppliers />} />
             <Route path="reports" element={<Reports />} />
+            <Route path="accessories" element={<Accessories />} />
             <Route path="settings" element={<Settings />} />
             
             <Route path="*" element={<Navigate to="/" replace />} />

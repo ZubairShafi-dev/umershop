@@ -6,14 +6,16 @@ import {
   Package, 
   ShoppingCart, 
   DollarSign, 
-  Loader2
+  Loader2,
+  PackageCheck
 } from 'lucide-react';
 import { 
   Tooltip, 
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  Legend
 } from 'recharts';
 
 const COLORS = ['#14b8a6', '#0d9488', '#0f766e', '#115e59', '#134e4a'];
@@ -33,7 +35,8 @@ const StatCard = ({ title, value, icon: Icon, color }) => (
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
-    totalStock: 0,
+    mobileStock: 0,
+    accessoryStock: 0,
     soldToday: 0,
     totalRevenue: 0,
     totalProfit: 0
@@ -44,7 +47,7 @@ export default function Dashboard() {
   useEffect(() => {
     setLoading(true);
     
-    // Real-time Mobiles
+    // 1. Listen to Mobiles
     const unsubscribeMobiles = onSnapshot(collection(db, 'mobiles'), (snapshot) => {
       const mobiles = snapshot.docs.map(doc => doc.data());
       const available = mobiles.filter(m => m.status === 'Available');
@@ -60,31 +63,53 @@ export default function Dashboard() {
       }));
       
       setDistributionData(distData.length > 0 ? distData : [{ name: 'No Stock', value: 0 }]);
-      setStats(prev => ({ ...prev, totalStock: available.length }));
-      setLoading(false);
+      setStats(prev => ({ ...prev, mobileStock: available.length }));
     });
 
-    // Real-time Sales
+    // 2. Listen to Accessories
+    const unsubscribeAccessories = onSnapshot(collection(db, 'accessories'), (snapshot) => {
+      const total = snapshot.docs.reduce((sum, doc) => sum + (doc.data().quantity || 0), 0);
+      setStats(prev => ({ ...prev, accessoryStock: total }));
+    });
+
+    // 3. Listen to Sales
     const qSales = query(collection(db, 'sales'), orderBy('soldAt', 'desc'));
     const unsubscribeSales = onSnapshot(qSales, (snapshot) => {
-      const sales = snapshot.docs.map(doc => doc.data());
+      const sales = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       const today = new Date().toDateString();
-      const salesToday = sales.filter(s => new Date(s.soldAt).toDateString() === today);
+      
+      let totalRevenue = 0;
+      let totalProfit = 0;
+      let soldToday = 0;
 
-      const totalRevenue = sales.reduce((sum, s) => sum + (s.salePrice || 0), 0);
-      const totalProfit = sales.reduce((sum, s) => sum + (s.profit || 0), 0);
+      sales.forEach(s => {
+        const amount = (s.totalAmount || s.salePrice || 0);
+        const profit = (s.totalProfit || s.profit || 0);
+        totalRevenue += amount;
+        totalProfit += profit;
+        
+        if (new Date(s.soldAt).toDateString() === today) {
+           if (s.items) {
+             s.items.forEach(item => soldToday += item.qty);
+           } else {
+             soldToday += 1;
+           }
+        }
+      });
 
       setStats(prev => ({
         ...prev,
-        soldToday: salesToday.length,
+        soldToday,
         totalRevenue,
         totalProfit
       }));
       setRecentSales(sales.slice(0, 5));
+      setLoading(false);
     });
 
     return () => {
       unsubscribeMobiles();
+      unsubscribeAccessories();
       unsubscribeSales();
     };
   }, []);
@@ -101,24 +126,48 @@ export default function Dashboard() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-white mb-2">Dashboard Overview</h1>
-        <p className="text-slate-400 text-sm">Live inventory and sales tracking.</p>
+        <p className="text-slate-400 text-sm">Real-time inventory & sales intelligence.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Stock" value={`${stats.totalStock} Units`} icon={Package} color="primary" />
-        <StatCard title="Sold Today" value={`${stats.soldToday} Units`} icon={ShoppingCart} color="emerald" />
+        <StatCard title="Mobile Stock" value={`${stats.mobileStock} Units`} icon={Package} color="primary" />
+        <StatCard title="Accessory Items" value={`${stats.accessoryStock} Items`} icon={PackageCheck} color="indigo" />
         <StatCard title="Total Revenue" value={`Rs. ${stats.totalRevenue.toLocaleString()}`} icon={TrendingUp} color="amber" />
-        <StatCard title="Total Profit" value={`Rs. ${stats.totalProfit.toLocaleString()}`} icon={DollarSign} color="indigo" />
+        <StatCard title="Today's Profit" value={`Rs. ${stats.totalProfit.toLocaleString()}`} icon={DollarSign} color="emerald" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 card p-6 flex flex-col items-center justify-center text-slate-500 italic">
-           <TrendingUp className="w-12 h-12 mb-4 opacity-10" />
-           <p>Sales trends will sync automatically.</p>
+        <div className="lg:col-span-2 card p-6">
+           <h3 className="text-lg font-bold text-white mb-6">Recent Sales Activity</h3>
+           <div className="space-y-4">
+              {recentSales.length === 0 ? (
+                <div className="text-center py-12 text-slate-500 italic">No sales activity yet.</div>
+              ) : (
+                recentSales.map((sale) => (
+                  <div key={sale.id} className="flex items-center justify-between p-4 rounded-xl bg-slate-800/30 border border-slate-800">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-primary-500/10 flex items-center justify-center">
+                         <ShoppingCart className="w-5 h-5 text-primary-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-white">
+                          {sale.items ? `${sale.items.length} item(s)` : `${sale.brand} ${sale.model}`}
+                        </p>
+                        <p className="text-[10px] text-slate-500">{new Date(sale.soldAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {sale.customerName || 'Walk-in'}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                       <p className="text-sm font-bold text-white">Rs. {(sale.totalAmount || sale.salePrice).toLocaleString()}</p>
+                       <p className="text-[10px] text-emerald-400 font-bold">Profit: Rs. {(sale.totalProfit || sale.profit).toLocaleString()}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+           </div>
         </div>
 
         <div className="card p-6">
-          <h3 className="text-lg font-bold text-white mb-6">Stock by Brand</h3>
+          <h3 className="text-lg font-bold text-white mb-6">Stock Distribution</h3>
           <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -131,9 +180,9 @@ export default function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
           </div>
-          <div className="mt-4 space-y-2 max-h-40 overflow-y-auto">
+          <div className="mt-4 space-y-2 max-h-40 overflow-y-auto pr-2">
             {distributionData.map((brand, i) => (
-              <div key={brand.name} className="flex items-center justify-between text-sm">
+              <div key={brand.name} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2 text-slate-400">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                   {brand.name}
@@ -142,36 +191,6 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-        </div>
-      </div>
-
-      <div className="card overflow-hidden">
-        <div className="p-6 border-b border-slate-800"><h3 className="text-lg font-bold text-white">Recent Sales</h3></div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-slate-900/50 text-slate-400 text-xs uppercase tracking-wider">
-                <th className="px-6 py-4">Device</th>
-                <th className="px-6 py-4">IMEI</th>
-                <th className="px-6 py-4">Price</th>
-                <th className="px-6 py-4">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800">
-              {recentSales.length === 0 ? (
-                <tr><td colSpan="4" className="px-6 py-12 text-center text-slate-500 italic">Waiting for first sale...</td></tr>
-              ) : (
-                recentSales.map((sale, i) => (
-                  <tr key={i} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="px-6 py-4 text-white font-medium">{sale.brand} {sale.model}</td>
-                    <td className="px-6 py-4 text-slate-400 font-mono">{sale.imei}</td>
-                    <td className="px-6 py-4 text-white">Rs. {sale.salePrice.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-slate-500">{new Date(sale.soldAt).toLocaleDateString()}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>

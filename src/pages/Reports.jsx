@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -10,7 +10,8 @@ import {
   Calendar,
   Download,
   Filter,
-  Loader2
+  Loader2,
+  Smartphone
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -34,7 +35,7 @@ export default function Reports() {
     totalRevenue: 0,
     totalProfit: 0,
     totalSales: 0,
-    avgProfitPerDevice: 0
+    totalUnits: 0
   });
 
   useEffect(() => {
@@ -50,14 +51,25 @@ export default function Reports() {
       setSales(salesData);
 
       // Calculate Stats
-      const totalRevenue = salesData.reduce((sum, sale) => sum + (sale.salePrice || 0), 0);
-      const totalProfit = salesData.reduce((sum, sale) => sum + (sale.profit || 0), 0);
+      let totalRevenue = 0;
+      let totalProfit = 0;
+      let totalUnits = 0;
+
+      salesData.forEach(sale => {
+        totalRevenue += (sale.totalAmount || sale.salePrice || 0);
+        totalProfit += (sale.totalProfit || sale.profit || 0);
+        if (sale.items) {
+           sale.items.forEach(item => totalUnits += item.qty);
+        } else {
+           totalUnits += 1;
+        }
+      });
       
       setStats({
         totalRevenue,
         totalProfit,
         totalSales: salesData.length,
-        avgProfitPerDevice: salesData.length > 0 ? totalProfit / salesData.length : 0
+        totalUnits
       });
 
     } catch (error) {
@@ -67,27 +79,36 @@ export default function Reports() {
     }
   };
 
-  // Prepare Chart Data (Aggregated by day)
+  // Prepare Chart Data
   const chartData = sales.reduce((acc, sale) => {
     const date = new Date(sale.soldAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const existing = acc.find(d => d.date === date);
+    const amount = (sale.totalAmount || sale.salePrice || 0);
+    const profit = (sale.totalProfit || sale.profit || 0);
+    
     if (existing) {
-      existing.revenue += sale.salePrice;
-      existing.profit += sale.profit;
+      existing.revenue += amount;
+      existing.profit += profit;
     } else {
-      acc.push({ date, revenue: sale.salePrice, profit: sale.profit });
+      acc.push({ date, revenue: amount, profit });
     }
     return acc;
   }, []).reverse().slice(-parseInt(timeRange));
 
-  // Prepare Model Popularity Data
-  const modelData = sales.reduce((acc, sale) => {
-    const model = `${sale.brand} ${sale.model}`;
-    const existing = acc.find(d => d.model === model);
-    if (existing) {
-      existing.count += 1;
+  // Best Selling Items
+  const bestSellers = sales.reduce((acc, sale) => {
+    if (sale.items) {
+      sale.items.forEach(item => {
+        const name = item.name;
+        const existing = acc.find(d => d.name === name);
+        if (existing) existing.count += item.qty;
+        else acc.push({ name, count: item.qty });
+      });
     } else {
-      acc.push({ model, count: 1 });
+      const name = `${sale.brand} ${sale.model}`;
+      const existing = acc.find(d => d.name === name);
+      if (existing) existing.count += 1;
+      else acc.push({ name, count: 1 });
     }
     return acc;
   }, []).sort((a, b) => b.count - a.count).slice(0, 5);
@@ -100,11 +121,11 @@ export default function Reports() {
             <BarChart3 className="w-6 h-6 text-primary-400" />
             Reports & Analytics
           </h1>
-          <p className="text-slate-400 text-sm">Detailed insights into your sales performance and profits.</p>
+          <p className="text-slate-400 text-sm">Comprehensive performance tracking across mobiles and accessories.</p>
         </div>
         <div className="flex gap-2">
           <select 
-            className="bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 px-4 py-2 outline-none focus:ring-1 focus:ring-primary-500"
+            className="bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 px-4 py-2 outline-none"
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
           >
@@ -112,42 +133,29 @@ export default function Reports() {
             <option value="30">Last 30 Days</option>
             <option value="90">Last 90 Days</option>
           </select>
-          <button className="btn-secondary flex items-center gap-2 px-4 py-2 text-sm">
-            <Download className="w-4 h-4" />
-            Export CSV
-          </button>
         </div>
       </div>
 
-      {/* Stats Summary */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="card p-6 border-l-4 border-l-primary-500">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Total Revenue</p>
           <p className="text-2xl font-bold text-white">Rs. {stats.totalRevenue.toLocaleString()}</p>
-          <div className="mt-2 flex items-center gap-1 text-emerald-400 text-xs">
-            <TrendingUp className="w-3 h-3" />
-            <span>Growth trend active</span>
-          </div>
         </div>
         <div className="card p-6 border-l-4 border-l-emerald-500">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Total Profit</p>
           <p className="text-2xl font-bold text-emerald-400">Rs. {stats.totalProfit.toLocaleString()}</p>
-          <p className="text-[10px] text-slate-500 mt-2">Margin: {((stats.totalProfit / stats.totalRevenue) * 100 || 0).toFixed(1)}%</p>
         </div>
         <div className="card p-6 border-l-4 border-l-amber-500">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Total Units Sold</p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Total Invoices</p>
           <p className="text-2xl font-bold text-white">{stats.totalSales}</p>
-          <p className="text-[10px] text-slate-500 mt-2">Inventory turnover active</p>
         </div>
         <div className="card p-6 border-l-4 border-l-indigo-500">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Avg. Profit / Unit</p>
-          <p className="text-2xl font-bold text-white">Rs. {Math.round(stats.avgProfitPerDevice).toLocaleString()}</p>
-          <p className="text-[10px] text-slate-500 mt-2">Performance metric</p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Units Sold</p>
+          <p className="text-2xl font-bold text-white">{stats.totalUnits}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sales Trend Chart */}
         <div className="card p-6">
           <h3 className="text-lg font-bold text-white mb-6">Revenue vs Profit Trend</h3>
           <div className="h-[350px] w-full">
@@ -156,9 +164,7 @@ export default function Reports() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                 <XAxis dataKey="date" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
-                />
+                <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }} />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
                 <Line type="monotone" dataKey="revenue" stroke="#14b8a6" strokeWidth={3} dot={{ r: 4, fill: '#14b8a6' }} />
                 <Line type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} />
@@ -167,80 +173,65 @@ export default function Reports() {
           </div>
         </div>
 
-        {/* Top Models Chart */}
         <div className="card p-6">
-          <h3 className="text-lg font-bold text-white mb-6">Best Selling Models</h3>
+          <h3 className="text-lg font-bold text-white mb-6">Top Selling Items</h3>
           <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={modelData} layout="vertical">
+              <BarChart data={bestSellers} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-                <XAxis type="number" stroke="#64748b" fontSize={12} hide />
-                <YAxis dataKey="model" type="category" stroke="#94a3b8" fontSize={11} width={120} tickLine={false} axisLine={false} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }}
-                  cursor={{ fill: '#1e293b' }}
-                />
-                <Bar dataKey="count" fill="#14b8a6" radius={[0, 4, 4, 0]} barSize={24} />
+                <XAxis type="number" hide />
+                <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} width={150} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px' }} cursor={{ fill: '#1e293b' }} />
+                <Bar dataKey="count" fill="#14b8a6" radius={[0, 4, 4, 0]} barSize={20} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
 
-      {/* Detailed Sales Log */}
       <div className="card overflow-hidden">
-        <div className="p-6 border-b border-slate-800">
-          <h3 className="text-lg font-bold text-white">Detailed Sales History</h3>
-        </div>
+        <div className="p-6 border-b border-slate-800"><h3 className="text-lg font-bold text-white">Sales History</h3></div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full text-left text-sm">
             <thead>
               <tr className="bg-slate-900/50 text-slate-400 text-xs uppercase tracking-wider">
-                <th className="px-6 py-4 font-medium">Date & Time</th>
-                <th className="px-6 py-4 font-medium">Device Details</th>
-                <th className="px-6 py-4 font-medium">Customer</th>
-                <th className="px-6 py-4 font-medium">Sale Price</th>
-                <th className="px-6 py-4 font-medium">Profit</th>
-                <th className="px-6 py-4 font-medium">Sold By</th>
+                <th className="px-6 py-4">Date</th>
+                <th className="px-6 py-4">Items Sold</th>
+                <th className="px-6 py-4">Customer</th>
+                <th className="px-6 py-4 text-right">Total Price</th>
+                <th className="px-6 py-4 text-right">Net Profit</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
               {loading ? (
-                <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center">
-                    <Loader2 className="w-8 h-8 text-primary-500 animate-spin mx-auto" />
-                  </td>
-                </tr>
+                <tr><td colSpan="5" className="px-6 py-12 text-center"><Loader2 className="w-8 h-8 text-primary-500 animate-spin mx-auto" /></td></tr>
               ) : sales.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-slate-500 italic">
-                    No sales recorded yet.
-                  </td>
-                </tr>
+                <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-500 italic">No sales recorded.</td></tr>
               ) : (
                 sales.map((sale) => (
                   <tr key={sale.id} className="hover:bg-slate-800/30 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="text-sm text-white">{new Date(sale.soldAt).toLocaleDateString()}</div>
+                      <div className="text-white">{new Date(sale.soldAt).toLocaleDateString()}</div>
                       <div className="text-[10px] text-slate-500">{new Date(sale.soldAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm font-bold text-white">{sale.brand} {sale.model}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">{sale.imei}</div>
+                       <div className="space-y-1">
+                          {sale.items ? sale.items.map((item, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">{item.qty}x</span>
+                               <span className="text-slate-300 truncate max-w-[200px]">{item.name}</span>
+                            </div>
+                          )) : (
+                            <div className="flex items-center gap-2">
+                               <Smartphone className="w-3 h-3 text-slate-500" />
+                               <span className="text-slate-300">{sale.brand} {sale.model}</span>
+                            </div>
+                          )}
+                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-slate-300">{sale.customerName || 'Walk-in Customer'}</div>
-                      <div className="text-[10px] text-slate-500">{sale.customerPhone || 'N/A'}</div>
-                    </td>
-                    <td className="px-6 py-4 text-sm font-bold text-white">
-                      Rs. {sale.salePrice.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 text-sm font-bold text-emerald-400">
-                      Rs. {sale.profit.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 text-xs text-slate-400">
-                      {sale.soldBy}
-                    </td>
+                    <td className="px-6 py-4 text-slate-400">{sale.customerName || 'Walk-in'}</td>
+                    <td className="px-6 py-4 text-right font-bold text-white">Rs. {(sale.totalAmount || sale.salePrice).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-right font-bold text-emerald-400 text-xs">Rs. {(sale.totalProfit || sale.profit).toLocaleString()}</td>
                   </tr>
                 ))
               )}
