@@ -11,11 +11,15 @@ import {
   BarChart3, 
   Settings,
   Package,
-  Scan
+  Scan,
+  CreditCard,
+  CalendarDays
 } from 'lucide-react';
 
 export default function Sidebar({ isOpen, onClose }) {
   const { userRole } = useAuth();
+
+  const isAdmin = userRole === 'admin';
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -24,8 +28,12 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Inventory', path: '/inventory', icon: Smartphone },
     { name: 'IMEI Search', path: '/search', icon: Scan },
     { name: 'Sales', path: '/sales', icon: ShoppingCart },
-    { name: 'Suppliers', path: '/suppliers', icon: Users },
-    { name: 'Reports', path: '/reports', icon: BarChart3 },
+    ...(isAdmin ? [
+      { name: 'Suppliers', path: '/suppliers', icon: Users },
+      { name: 'Reports', path: '/reports', icon: BarChart3 },
+      { name: 'Expenses', path: '/expenses', icon: CreditCard },
+      { name: 'Installments', path: '/installments', icon: CalendarDays },
+    ] : []),
     { name: 'Settings', path: '/settings', icon: Settings },
   ];
 

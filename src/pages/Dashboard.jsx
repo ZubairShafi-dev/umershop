@@ -17,6 +17,7 @@ import {
   Cell,
   Legend
 } from 'recharts';
+import { useAuth } from '../context/AuthContext';
 
 const COLORS = ['#14b8a6', '#0d9488', '#0f766e', '#115e59', '#134e4a'];
 
@@ -33,6 +34,8 @@ const StatCard = ({ title, value, icon: Icon, color }) => (
 );
 
 export default function Dashboard() {
+  const { userRole } = useAuth();
+  const isAdmin = userRole === 'admin';
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     mobileStock: 0,
@@ -132,8 +135,13 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title="Mobile Stock" value={`${stats.mobileStock} Units`} icon={Package} color="primary" />
         <StatCard title="Accessory Items" value={`${stats.accessoryStock} Items`} icon={PackageCheck} color="indigo" />
-        <StatCard title="Total Revenue" value={`Rs. ${stats.totalRevenue.toLocaleString()}`} icon={TrendingUp} color="amber" />
-        <StatCard title="Today's Profit" value={`Rs. ${stats.totalProfit.toLocaleString()}`} icon={DollarSign} color="emerald" />
+        {isAdmin && (
+          <>
+            <StatCard title="Total Revenue" value={`Rs. ${stats.totalRevenue.toLocaleString()}`} icon={TrendingUp} color="amber" />
+            <StatCard title="Today's Profit" value={`Rs. ${stats.totalProfit.toLocaleString()}`} icon={DollarSign} color="emerald" />
+          </>
+        )}
+        {!isAdmin && <StatCard title="Sold Today" value={`${stats.soldToday} Units`} icon={ShoppingCart} color="emerald" />}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -158,7 +166,7 @@ export default function Dashboard() {
                     </div>
                     <div className="text-right">
                        <p className="text-sm font-bold text-white">Rs. {(sale.totalAmount || sale.salePrice).toLocaleString()}</p>
-                       <p className="text-[10px] text-emerald-400 font-bold">Profit: Rs. {(sale.totalProfit || sale.profit).toLocaleString()}</p>
+                       {isAdmin && <p className="text-[10px] text-emerald-400 font-bold">Profit: Rs. {(sale.totalProfit || sale.profit).toLocaleString()}</p>}
                     </div>
                   </div>
                 ))

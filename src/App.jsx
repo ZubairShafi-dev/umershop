@@ -15,6 +15,8 @@ import SalesScreen from './pages/SalesScreen';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Accessories from './pages/Accessories';
+import Expenses from './pages/Expenses';
+import Installments from './pages/Installments';
 
 function App() {
   return (
@@ -59,6 +61,8 @@ function App() {
             <Route path="suppliers" element={<Suppliers />} />
             <Route path="reports" element={<Reports />} />
             <Route path="accessories" element={<Accessories />} />
+            <Route path="expenses" element={<Expenses />} />
+            <Route path="installments" element={<Installments />} />
             <Route path="settings" element={<Settings />} />
             
             <Route path="*" element={<Navigate to="/" replace />} />

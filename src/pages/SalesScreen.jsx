@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, doc, updateDoc, addDoc, or, runTransaction } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, addDoc, or, runTransaction, orderBy } from 'firebase/firestore';
 import { 
   ShoppingCart, 
   Scan, 
@@ -21,10 +21,71 @@ import {
   Minus,
   Search,
   Trash2,
+  Printer,
   Barcode as BarcodeIcon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useReactToPrint } from 'react-to-print';
 import toast from 'react-hot-toast';
+
+// Printable Receipt Component
+const PrintableReceipt = React.forwardRef(({ sale, customerInfo }, ref) => {
+  if (!sale) return null;
+  const today = new Date().toLocaleDateString();
+  const time = new Date().toLocaleTimeString();
+
+  return (
+    <div ref={ref} className="p-8 bg-white text-black font-sans w-[80mm] mx-auto text-[12px]">
+      <div className="text-center border-b border-black pb-4 mb-4">
+        <h2 className="text-xl font-black uppercase tracking-tighter">Umar Mobile</h2>
+        <p className="text-[10px] font-bold">Main Market, Near Clock Tower</p>
+        <p className="text-[10px]">Contact: 0300-1234567</p>
+      </div>
+
+      <div className="mb-4 space-y-1 border-b border-black pb-2">
+        <div className="flex justify-between"><span>Date:</span> <span className="font-bold">{today}</span></div>
+        <div className="flex justify-between"><span>Time:</span> <span className="font-bold">{time}</span></div>
+        <div className="flex justify-between"><span>Customer:</span> <span className="font-bold">{customerInfo.name || 'Walk-in'}</span></div>
+        {customerInfo.phone && <div className="flex justify-between"><span>Phone:</span> <span className="font-bold">{customerInfo.phone}</span></div>}
+      </div>
+
+      <table className="w-full mb-4">
+        <thead className="border-b border-black">
+          <tr className="text-left font-bold">
+            <th className="py-1">Item</th>
+            <th className="py-1 text-center">Qty</th>
+            <th className="py-1 text-right">Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sale.items.map((item, idx) => (
+            <tr key={idx} className="border-b border-slate-100">
+              <td className="py-2">
+                <p className="font-bold">{item.name}</p>
+                {item.imei && <p className="text-[8px] font-mono">IMEI: {item.imei}</p>}
+              </td>
+              <td className="py-2 text-center">{item.qty}</td>
+              <td className="py-2 text-right">Rs. {item.salePrice.toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div className="space-y-1 border-t border-black pt-2">
+        <div className="flex justify-between text-lg font-black">
+          <span>TOTAL:</span>
+          <span>Rs. {sale.totalAmount.toLocaleString()}</span>
+        </div>
+      </div>
+
+      <div className="mt-8 text-center border-t border-dashed border-black pt-4">
+        <p className="font-bold uppercase italic">Thank You for Shopping!</p>
+        <p className="text-[8px] mt-1">Software by Mobiv ERP</p>
+        <p className="text-[8px]">No warranty without receipt. Software/LCD No Warranty.</p>
+      </div>
+    </div>
+  );
+});
 
 export default function SalesScreen() {
   const { currentUser } = useAuth();
@@ -35,6 +96,7 @@ export default function SalesScreen() {
   const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '' });
   const [submitting, setSubmitting] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
+  const [completedSaleData, setCompletedSaleData] = useState(null);
   
   // Manual Search for Accessories
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -43,7 +105,12 @@ export default function SalesScreen() {
   const [searchingAccessories, setSearchingAccessories] = useState(false);
 
   const inputRef = useRef(null);
+  const receiptRef = useRef();
   const location = useLocation();
+
+  const handlePrint = useReactToPrint({
+    contentRef: receiptRef,
+  });
 
   useEffect(() => {
     if (inputRef.current) inputRef.current.focus();
@@ -51,7 +118,6 @@ export default function SalesScreen() {
     // Auto-scan if coming from IMEI Search
     if (location.state?.scanCode) {
       setScanValue(location.state.scanCode);
-      // We need a small delay to ensure state is set before searching
       setTimeout(() => {
         handleSearch(null, location.state.scanCode);
       }, 100);
@@ -66,7 +132,6 @@ export default function SalesScreen() {
     try {
       setSearching(true);
       
-      // 1. Try finding in Mobiles (IMEI)
       const qMobile = query(
         collection(db, 'mobiles'), 
         or(
@@ -87,7 +152,6 @@ export default function SalesScreen() {
           return;
         }
 
-        // Check if already in cart
         if (cart.find(item => item.id === data.id)) {
           toast.error("Mobile already in cart");
         } else {
@@ -98,7 +162,6 @@ export default function SalesScreen() {
         return;
       }
 
-      // 2. Try finding in Accessories (Barcode)
       const qAccessory = query(collection(db, 'accessories'), where('barcode', '==', val));
       const accessorySnap = await getDocs(qAccessory);
 
@@ -185,27 +248,28 @@ export default function SalesScreen() {
     try {
       setSubmitting(true);
       
+      const saleData = {
+        items: cart.map(item => ({
+          id: item.id,
+          name: item.name || `${item.brand} ${item.model}`,
+          type: item.type,
+          qty: item.qty,
+          salePrice: item.salePrice,
+          purchasePrice: item.purchasePrice,
+          profit: (item.salePrice - item.purchasePrice) * item.qty,
+          imei: item.type === 'mobile' ? (item.imei1 || item.imei) : null
+        })),
+        totalAmount,
+        totalProfit,
+        customerName: customerInfo.name,
+        customerPhone: customerInfo.phone,
+        soldBy: currentUser.email,
+        soldAt: new Date().toISOString()
+      };
+
       await runTransaction(db, async (transaction) => {
         // 1. Prepare Sale Record
         const saleRef = collection(db, 'sales');
-        const saleData = {
-          items: cart.map(item => ({
-            id: item.id,
-            name: item.name || `${item.brand} ${item.model}`,
-            type: item.type,
-            qty: item.qty,
-            salePrice: item.salePrice,
-            purchasePrice: item.purchasePrice,
-            profit: (item.salePrice - item.purchasePrice) * item.qty,
-            imei: item.type === 'mobile' ? (item.imei1 || item.imei) : null
-          })),
-          totalAmount,
-          totalProfit,
-          customerName: customerInfo.name,
-          customerPhone: customerInfo.phone,
-          soldBy: currentUser.email,
-          soldAt: new Date().toISOString()
-        };
 
         // 2. Update Inventories
         for (const item of cart) {
@@ -225,9 +289,9 @@ export default function SalesScreen() {
         await addDoc(saleRef, saleData);
       });
 
+      setCompletedSaleData(saleData);
       toast.success("Sale completed successfully!");
       setSaleComplete(true);
-      setTimeout(() => resetScreen(), 3000);
     } catch (error) {
       console.error("Sale error:", error);
       toast.error("Transaction failed: " + error.message);
@@ -241,12 +305,13 @@ export default function SalesScreen() {
     setScanValue('');
     setCustomerInfo({ name: '', phone: '' });
     setSaleComplete(false);
+    setCompletedSaleData(null);
     if (inputRef.current) inputRef.current.focus();
   };
 
   if (saleComplete) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 space-y-6 animate-in fade-in zoom-in duration-500">
+      <div className="flex flex-col items-center justify-center py-10 space-y-8 animate-in fade-in zoom-in duration-500">
         <div className="w-24 h-24 rounded-full bg-emerald-500 flex items-center justify-center shadow-2xl shadow-emerald-500/20">
           <CheckCircle2 className="w-12 h-12 text-white" />
         </div>
@@ -254,7 +319,20 @@ export default function SalesScreen() {
           <h2 className="text-3xl font-bold text-white mb-2">Sale Completed!</h2>
           <p className="text-slate-400">Inventory updated and sale recorded.</p>
         </div>
-        <button onClick={resetScreen} className="btn-primary px-8 py-3 flex items-center gap-2">New Sale Transaction <ArrowRight className="w-4 h-4" /></button>
+
+        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+           <button onClick={handlePrint} className="btn-primary flex-1 py-4 flex items-center justify-center gap-2 text-lg">
+             <Printer className="w-6 h-6" /> Print Receipt
+           </button>
+           <button onClick={resetScreen} className="btn-secondary flex-1 py-4 flex items-center justify-center gap-2 text-lg border-slate-700">
+             New Sale <ArrowRight className="w-5 h-5" />
+           </button>
+        </div>
+
+        {/* Hidden Printable Receipt */}
+        <div className="hidden">
+           <PrintableReceipt ref={receiptRef} sale={completedSaleData} customerInfo={customerInfo} />
+        </div>
       </div>
     );
   }
@@ -279,7 +357,6 @@ export default function SalesScreen() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          {/* Scanner Input */}
           <div className="card p-6 border-primary-500/20 bg-primary-500/5">
             <div className="flex items-center gap-3 mb-4">
               <Scan className="w-5 h-5 text-primary-400" />
@@ -303,7 +380,6 @@ export default function SalesScreen() {
             </form>
           </div>
 
-          {/* Cart Table */}
           <div className="card overflow-hidden">
             <div className="p-4 border-b border-slate-800 bg-slate-900/30 flex justify-between items-center">
               <h3 className="font-bold text-white flex items-center gap-2"><ShoppingCart className="w-4 h-4" /> Cart Items ({cart.length})</h3>
@@ -370,7 +446,6 @@ export default function SalesScreen() {
           </div>
         </div>
 
-        {/* Sidebar Summary */}
         <div className="space-y-6">
           <div className="card p-6 bg-slate-900 border-slate-800">
             <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2"><Receipt className="w-5 h-5 text-slate-400" /> Sale Summary</h3>
@@ -405,7 +480,6 @@ export default function SalesScreen() {
         </div>
       </div>
 
-      {/* Manual Search Modal */}
       {isSearchModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="card w-full max-w-2xl bg-slate-900 overflow-hidden">
