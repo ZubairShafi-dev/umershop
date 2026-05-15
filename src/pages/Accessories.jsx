@@ -12,7 +12,6 @@ import {
   X, 
   Loader2,
   AlertTriangle,
-  ChevronRight,
   Filter
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -88,6 +87,9 @@ export default function Accessories() {
     return () => unsubscribe();
   }, []);
 
+  // Build a dynamic category list combining predefined + any custom ones from data
+  const allCategories = [...new Set([...CATEGORIES, ...accessories.map(a => a.category).filter(Boolean)])].sort();
+
   const handleOpenModal = (item = null) => {
     if (item) {
       setCurrentAccessory(item);
@@ -105,7 +107,7 @@ export default function Accessories() {
       setFormData({
         name: '',
         category: 'Cables',
-        barcode: `ACC-${Date.now().toString().slice(-8)}`, // Auto-generate simple barcode
+        barcode: `ACC-${Date.now().toString().slice(-8)}`,
         purchasePrice: '',
         sellingPrice: '',
         quantity: '',
@@ -191,15 +193,15 @@ export default function Accessories() {
           />
         </div>
         <div className="flex items-center gap-2">
-           <Filter className="w-4 h-4 text-slate-500" />
-           <select 
-             className="bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 px-3 py-2 outline-none"
-             value={categoryFilter}
-             onChange={(e) => setCategoryFilter(e.target.value)}
-           >
-             <option value="all">All Categories</option>
-             {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-           </select>
+          <Filter className="w-4 h-4 text-slate-500" />
+          <select 
+            className="bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 px-3 py-2 outline-none"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+          >
+            <option value="all">All Categories</option>
+            {allCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+          </select>
         </div>
       </div>
 
@@ -280,36 +282,48 @@ export default function Accessories() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Item Name *</label>
-                  <input type="text" required className="input-field" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="e.g. iPhone 15 Pro Max Cover" />
+                  <input type="text" required className="input-field" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. iPhone 15 Pro Max Cover" />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Category</label>
-                  <select className="input-field py-2" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
-                    {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                  </select>
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">
+                    Category
+                    <span className="ml-2 text-slate-600 normal-case font-normal">(select or type your own)</span>
+                  </label>
+                  {/* Use datalist so user can pick from suggestions OR type a custom value */}
+                  <input
+                    type="text"
+                    list="category-suggestions"
+                    className="input-field"
+                    value={formData.category}
+                    onChange={e => setFormData({ ...formData, category: e.target.value })}
+                    placeholder="Select or type category..."
+                  />
+                  <datalist id="category-suggestions">
+                    {CATEGORIES.map(cat => <option key={cat} value={cat} />)}
+                  </datalist>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Barcode / SKU</label>
                   <div className="relative">
-                    <input type="text" required className="input-field" value={formData.barcode} onChange={e => setFormData({...formData, barcode: e.target.value})} />
+                    <input type="text" required className="input-field" value={formData.barcode} onChange={e => setFormData({ ...formData, barcode: e.target.value })} />
                     <BarcodeIcon className="absolute right-3 top-2.5 w-4 h-4 text-slate-500" />
                   </div>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Cost Price *</label>
-                  <input type="number" required className="input-field" value={formData.purchasePrice} onChange={e => setFormData({...formData, purchasePrice: e.target.value})} />
+                  <input type="number" required className="input-field" value={formData.purchasePrice} onChange={e => setFormData({ ...formData, purchasePrice: e.target.value })} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Selling Price *</label>
-                  <input type="number" required className="input-field" value={formData.sellingPrice} onChange={e => setFormData({...formData, sellingPrice: e.target.value})} />
+                  <input type="number" required className="input-field" value={formData.sellingPrice} onChange={e => setFormData({ ...formData, sellingPrice: e.target.value })} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Stock Quantity *</label>
-                  <input type="number" required className="input-field" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} />
+                  <input type="number" required className="input-field" value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: e.target.value })} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Min Stock Alert</label>
-                  <input type="number" required className="input-field" value={formData.minStock} onChange={e => setFormData({...formData, minStock: e.target.value})} />
+                  <input type="number" required className="input-field" value={formData.minStock} onChange={e => setFormData({ ...formData, minStock: e.target.value })} />
                 </div>
               </div>
               <div className="pt-4 flex gap-3">

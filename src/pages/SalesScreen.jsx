@@ -22,7 +22,9 @@ import {
   Search,
   Trash2,
   Printer,
-  Barcode as BarcodeIcon
+  Barcode as BarcodeIcon,
+  CreditCard,
+  Hash
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useReactToPrint } from 'react-to-print';
@@ -31,8 +33,8 @@ import toast from 'react-hot-toast';
 // Printable Receipt Component
 const PrintableReceipt = React.forwardRef(({ sale, customerInfo }, ref) => {
   if (!sale) return null;
-  const today = new Date().toLocaleDateString();
-  const time = new Date().toLocaleTimeString();
+  const today = new Date().toLocaleDateString('en-PK');
+  const time = new Date().toLocaleTimeString('en-PK');
 
   return (
     <div ref={ref} className="p-8 bg-white text-black font-sans w-[80mm] mx-auto text-[12px]">
@@ -47,6 +49,7 @@ const PrintableReceipt = React.forwardRef(({ sale, customerInfo }, ref) => {
         <div className="flex justify-between"><span>Time:</span> <span className="font-bold">{time}</span></div>
         <div className="flex justify-between"><span>Customer:</span> <span className="font-bold">{customerInfo.name || 'Walk-in'}</span></div>
         {customerInfo.phone && <div className="flex justify-between"><span>Phone:</span> <span className="font-bold">{customerInfo.phone}</span></div>}
+        {customerInfo.idNumber && <div className="flex justify-between"><span>ID No.:</span> <span className="font-bold">{customerInfo.idNumber}</span></div>}
       </div>
 
       <table className="w-full mb-4">
@@ -65,7 +68,7 @@ const PrintableReceipt = React.forwardRef(({ sale, customerInfo }, ref) => {
                 {item.imei && <p className="text-[8px] font-mono">IMEI: {item.imei}</p>}
               </td>
               <td className="py-2 text-center">{item.qty}</td>
-              <td className="py-2 text-right">Rs. {item.salePrice.toLocaleString()}</td>
+              <td className="py-2 text-right">Rs. {(item.salePrice * item.qty).toLocaleString()}</td>
             </tr>
           ))}
         </tbody>
@@ -93,7 +96,7 @@ export default function SalesScreen() {
   const [searching, setSearching] = useState(false);
   const [cart, setCart] = useState([]);
   
-  const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '' });
+  const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '', idNumber: '' });
   const [submitting, setSubmitting] = useState(false);
   const [saleComplete, setSaleComplete] = useState(false);
   const [completedSaleData, setCompletedSaleData] = useState(null);
@@ -168,8 +171,8 @@ export default function SalesScreen() {
       if (!accessorySnap.empty) {
         const data = { id: accessorySnap.docs[0].id, ...accessorySnap.docs[0].data(), type: 'accessory' };
         if (data.quantity <= 0) {
-           toast.error("Item out of stock");
-           return;
+          toast.error("Item out of stock");
+          return;
         }
         addItemToCart(data);
         setScanValue('');
@@ -263,15 +266,14 @@ export default function SalesScreen() {
         totalProfit,
         customerName: customerInfo.name,
         customerPhone: customerInfo.phone,
+        customerIdNumber: customerInfo.idNumber,
         soldBy: currentUser.email,
         soldAt: new Date().toISOString()
       };
 
       await runTransaction(db, async (transaction) => {
-        // 1. Prepare Sale Record
         const saleRef = collection(db, 'sales');
 
-        // 2. Update Inventories
         for (const item of cart) {
           if (item.type === 'mobile') {
             const mobileRef = doc(db, 'mobiles', item.id);
@@ -285,7 +287,6 @@ export default function SalesScreen() {
           }
         }
 
-        // 3. Save Sale
         await addDoc(saleRef, saleData);
       });
 
@@ -303,7 +304,7 @@ export default function SalesScreen() {
   const resetScreen = () => {
     setCart([]);
     setScanValue('');
-    setCustomerInfo({ name: '', phone: '' });
+    setCustomerInfo({ name: '', phone: '', idNumber: '' });
     setSaleComplete(false);
     setCompletedSaleData(null);
     if (inputRef.current) inputRef.current.focus();
@@ -318,20 +319,32 @@ export default function SalesScreen() {
         <div className="text-center">
           <h2 className="text-3xl font-bold text-white mb-2">Sale Completed!</h2>
           <p className="text-slate-400">Inventory updated and sale recorded.</p>
+          {completedSaleData?.customerName && (
+            <p className="text-primary-400 font-bold mt-1">{completedSaleData.customerName}</p>
+          )}
+        </div>
+
+        {/* Sale Summary Card */}
+        <div className="card p-6 w-full max-w-md space-y-3">
+          <div className="flex justify-between text-sm"><span className="text-slate-400">Items Sold</span><span className="text-white font-bold">{cart.length}</span></div>
+          <div className="flex justify-between text-sm"><span className="text-slate-400">Total Amount</span><span className="text-primary-400 font-bold">Rs. {totalAmount.toLocaleString()}</span></div>
+          {completedSaleData?.customerIdNumber && (
+            <div className="flex justify-between text-sm"><span className="text-slate-400">Customer ID</span><span className="text-slate-300 font-mono">{completedSaleData.customerIdNumber}</span></div>
+          )}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-           <button onClick={handlePrint} className="btn-primary flex-1 py-4 flex items-center justify-center gap-2 text-lg">
-             <Printer className="w-6 h-6" /> Print Receipt
-           </button>
-           <button onClick={resetScreen} className="btn-secondary flex-1 py-4 flex items-center justify-center gap-2 text-lg border-slate-700">
-             New Sale <ArrowRight className="w-5 h-5" />
-           </button>
+          <button onClick={handlePrint} className="btn-primary flex-1 py-4 flex items-center justify-center gap-2 text-lg">
+            <Printer className="w-6 h-6" /> Print Bill
+          </button>
+          <button onClick={resetScreen} className="btn-secondary flex-1 py-4 flex items-center justify-center gap-2 text-lg border-slate-700">
+            New Sale <ArrowRight className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Hidden Printable Receipt */}
         <div className="hidden">
-           <PrintableReceipt ref={receiptRef} sale={completedSaleData} customerInfo={customerInfo} />
+          <PrintableReceipt ref={receiptRef} sale={completedSaleData} customerInfo={customerInfo} />
         </div>
       </div>
     );
@@ -374,7 +387,7 @@ export default function SalesScreen() {
               <BarcodeIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-500" />
               {searching && (
                 <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                   <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
+                  <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
                 </div>
               )}
             </form>
@@ -405,7 +418,7 @@ export default function SalesScreen() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className={`p-2 rounded-lg ${item.type === 'mobile' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-primary-500/10 text-primary-400'}`}>
-                               {item.type === 'mobile' ? <Smartphone className="w-4 h-4" /> : <Package className="w-4 h-4" />}
+                              {item.type === 'mobile' ? <Smartphone className="w-4 h-4" /> : <Package className="w-4 h-4" />}
                             </div>
                             <div>
                               <div className="text-sm font-bold text-white">{item.name || `${item.brand} ${item.model}`}</div>
@@ -414,24 +427,24 @@ export default function SalesScreen() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                           {item.type === 'accessory' ? (
-                             <div className="flex items-center gap-3">
-                               <button onClick={() => updateCartQty(item.id, -1)} className="p-1 rounded bg-slate-800 hover:bg-slate-700"><Minus className="w-3 h-3" /></button>
-                               <span className="text-sm font-bold text-white w-4 text-center">{item.qty}</span>
-                               <button onClick={() => updateCartQty(item.id, 1)} className="p-1 rounded bg-slate-800 hover:bg-slate-700"><Plus className="w-3 h-3" /></button>
-                             </div>
-                           ) : <span className="text-sm text-slate-400 font-medium">1 Unit</span>}
+                          {item.type === 'accessory' ? (
+                            <div className="flex items-center gap-3">
+                              <button onClick={() => updateCartQty(item.id, -1)} className="p-1 rounded bg-slate-800 hover:bg-slate-700"><Minus className="w-3 h-3" /></button>
+                              <span className="text-sm font-bold text-white w-4 text-center">{item.qty}</span>
+                              <button onClick={() => updateCartQty(item.id, 1)} className="p-1 rounded bg-slate-800 hover:bg-slate-700"><Plus className="w-3 h-3" /></button>
+                            </div>
+                          ) : <span className="text-sm text-slate-400 font-medium">1 Unit</span>}
                         </td>
                         <td className="px-6 py-4">
-                           <div className="relative max-w-[120px]">
-                             <span className="absolute left-2 top-2 text-[10px] text-slate-500">Rs.</span>
-                             <input 
-                               type="number" 
-                               className="bg-slate-900/50 border border-slate-700 rounded px-6 py-1.5 text-sm font-bold text-white w-full"
-                               value={item.salePrice}
-                               onChange={(e) => updateCartPrice(item.id, e.target.value)}
-                             />
-                           </div>
+                          <div className="relative max-w-[120px]">
+                            <span className="absolute left-2 top-2 text-[10px] text-slate-500">Rs.</span>
+                            <input 
+                              type="number" 
+                              className="bg-slate-900/50 border border-slate-700 rounded px-6 py-1.5 text-sm font-bold text-white w-full"
+                              value={item.salePrice}
+                              onChange={(e) => updateCartPrice(item.id, e.target.value)}
+                            />
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-sm font-bold text-white">Rs. {(item.salePrice * item.qty).toLocaleString()}</td>
                         <td className="px-6 py-4 text-right">
@@ -452,19 +465,53 @@ export default function SalesScreen() {
             
             <div className="space-y-4">
               <div className="space-y-3">
-                 <div className="flex justify-between text-sm"><span className="text-slate-500">Subtotal</span><span className="text-slate-200 font-medium">Rs. {totalAmount.toLocaleString()}</span></div>
-                 <div className="flex justify-between text-sm"><span className="text-slate-500">Discount</span><span className="text-slate-200">Rs. 0</span></div>
-                 <div className="pt-3 border-t border-slate-800 flex justify-between items-center">
-                    <span className="text-white font-bold text-lg">Total</span>
-                    <span className="text-2xl font-black text-primary-400">Rs. {totalAmount.toLocaleString()}</span>
-                 </div>
+                <div className="flex justify-between text-sm"><span className="text-slate-500">Subtotal</span><span className="text-slate-200 font-medium">Rs. {totalAmount.toLocaleString()}</span></div>
+                <div className="flex justify-between text-sm"><span className="text-slate-500">Discount</span><span className="text-slate-200">Rs. 0</span></div>
+                <div className="pt-3 border-t border-slate-800 flex justify-between items-center">
+                  <span className="text-white font-bold text-lg">Total</span>
+                  <span className="text-2xl font-black text-primary-400">Rs. {totalAmount.toLocaleString()}</span>
+                </div>
               </div>
 
               <div className="pt-4 space-y-4">
                 <div className="space-y-3">
                   <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Customer Details</h4>
-                  <input type="text" placeholder="Customer Name" className="input-field py-2 text-sm" value={customerInfo.name} onChange={e => setCustomerInfo({...customerInfo, name: e.target.value})} />
-                  <input type="tel" placeholder="Phone Number" className="input-field py-2 text-sm" value={customerInfo.phone} onChange={e => setCustomerInfo({...customerInfo, phone: e.target.value})} />
+                  
+                  {/* Customer Name */}
+                  <div className="relative">
+                    <User className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="Customer Name"
+                      className="input-field py-2 text-sm pl-9"
+                      value={customerInfo.name}
+                      onChange={e => setCustomerInfo({ ...customerInfo, name: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Phone Number */}
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+                    <input
+                      type="tel"
+                      placeholder="Phone Number"
+                      className="input-field py-2 text-sm pl-9"
+                      value={customerInfo.phone}
+                      onChange={e => setCustomerInfo({ ...customerInfo, phone: e.target.value })}
+                    />
+                  </div>
+
+                  {/* ID Number / CNIC */}
+                  <div className="relative">
+                    <CreditCard className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="ID / CNIC Number (Optional)"
+                      className="input-field py-2 text-sm pl-9 font-mono tracking-wider"
+                      value={customerInfo.idNumber}
+                      onChange={e => setCustomerInfo({ ...customerInfo, idNumber: e.target.value })}
+                    />
+                  </div>
                 </div>
                 
                 <button 
@@ -508,20 +555,20 @@ export default function SalesScreen() {
                 ) : (
                   searchResults.map(item => (
                     <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-primary-500/50 transition-colors group">
-                       <div>
-                         <p className="font-bold text-white">{item.name}</p>
-                         <p className="text-xs text-slate-500">{item.category} · Stock: {item.quantity}</p>
-                       </div>
-                       <div className="flex items-center gap-4">
-                         <p className="text-sm font-bold text-primary-400">Rs. {item.sellingPrice.toLocaleString()}</p>
-                         <button 
-                           onClick={() => { addItemToCart({ ...item, type: 'accessory' }); setIsSearchModalOpen(false); }}
-                           disabled={item.quantity <= 0}
-                           className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-500 disabled:bg-slate-800 disabled:text-slate-600"
-                         >
-                           <Plus className="w-4 h-4" />
-                         </button>
-                       </div>
+                      <div>
+                        <p className="font-bold text-white">{item.name}</p>
+                        <p className="text-xs text-slate-500">{item.category} · Stock: {item.quantity}</p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <p className="text-sm font-bold text-primary-400">Rs. {item.sellingPrice.toLocaleString()}</p>
+                        <button 
+                          onClick={() => { addItemToCart({ ...item, type: 'accessory' }); setIsSearchModalOpen(false); }}
+                          disabled={item.quantity <= 0}
+                          className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-500 disabled:bg-slate-800 disabled:text-slate-600"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -530,6 +577,11 @@ export default function SalesScreen() {
           </div>
         </div>
       )}
+
+      {/* Hidden Printable Receipt for in-progress print */}
+      <div className="hidden">
+        <PrintableReceipt ref={receiptRef} sale={completedSaleData} customerInfo={customerInfo} />
+      </div>
     </div>
   );
 }

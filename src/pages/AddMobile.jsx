@@ -13,7 +13,8 @@ import {
   UserPlus,
   ChevronDown,
   Check,
-  Building2
+  Building2,
+  PenLine
 } from 'lucide-react';
 import { Dialog, Transition, Combobox } from '@headlessui/react';
 import toast from 'react-hot-toast';
@@ -27,7 +28,10 @@ const MOBILE_DATA = {
   'Realme': ['Realme 11 Pro+', 'Realme 11', 'Realme C55', 'Realme C53', 'GT Neo 5'],
   'Infinix': ['Note 30 Pro', 'Note 30', 'Hot 30', 'Zero 30 5G', 'Smart 7'],
   'Tecno': ['Camon 20 Premier', 'Camon 20', 'Spark 10 Pro', 'Phantom V Fold'],
-  'Google': ['Pixel 8 Pro', 'Pixel 8', 'Pixel 7a', 'Pixel 7 Pro', 'Pixel Fold']
+  'Google': ['Pixel 8 Pro', 'Pixel 8', 'Pixel 7a', 'Pixel 7 Pro', 'Pixel Fold'],
+  'OnePlus': ['OnePlus 12', 'OnePlus 11', 'OnePlus Nord CE 3', 'OnePlus Nord 3'],
+  'Nokia': ['Nokia G42', 'Nokia C32', 'Nokia G21'],
+  'Motorola': ['Moto G84', 'Moto G54', 'Moto Edge 40'],
 };
 
 export default function AddMobile() {
@@ -63,7 +67,6 @@ export default function AddMobile() {
   const [addingSupplier, setAddingSupplier] = useState(false);
 
   useEffect(() => {
-    // Real-time suppliers listener
     const q = query(collection(db, 'suppliers'), orderBy('name', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setSuppliers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -74,14 +77,35 @@ export default function AddMobile() {
     return () => unsubscribe();
   }, []);
 
-  const filteredBrands = brandQuery === '' 
-    ? Object.keys(MOBILE_DATA) 
-    : Object.keys(MOBILE_DATA).filter(brand => brand.toLowerCase().includes(brandQuery.toLowerCase()));
+  // Filter brands — show typed value as first custom option if it doesn't match
+  const filteredBrands = brandQuery === ''
+    ? Object.keys(MOBILE_DATA)
+    : [
+        ...Object.keys(MOBILE_DATA).filter(brand =>
+          brand.toLowerCase().includes(brandQuery.toLowerCase())
+        ),
+        // Add the typed value as a custom option if not already in list
+        ...(Object.keys(MOBILE_DATA).some(b => b.toLowerCase() === brandQuery.toLowerCase())
+          ? []
+          : [brandQuery])
+      ];
 
-  const currentModels = formData.brand && MOBILE_DATA[formData.brand] ? MOBILE_DATA[formData.brand] : Object.values(MOBILE_DATA).flat();
+  const currentModels = formData.brand && MOBILE_DATA[formData.brand]
+    ? MOBILE_DATA[formData.brand]
+    : Object.values(MOBILE_DATA).flat();
+
+  // Filter models — show typed value as first custom option if it doesn't match
   const filteredModels = modelQuery === ''
     ? currentModels
-    : currentModels.filter(model => model.toLowerCase().includes(modelQuery.toLowerCase()));
+    : [
+        ...currentModels.filter(model =>
+          model.toLowerCase().includes(modelQuery.toLowerCase())
+        ),
+        // Add the typed value as a custom option if not already in list
+        ...(currentModels.some(m => m.toLowerCase() === modelQuery.toLowerCase())
+          ? []
+          : [modelQuery])
+      ];
 
   const filteredSuppliers = supplierQuery === ''
     ? suppliers
@@ -137,6 +161,10 @@ export default function AddMobile() {
     }
   };
 
+  // Helper to check if a value is a custom (user-typed) entry
+  const isCustomEntry = (value, list) =>
+    value && !list.includes(value);
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20">
       <div>
@@ -144,7 +172,7 @@ export default function AddMobile() {
           <PlusCircle className="w-6 h-6 text-primary-400" />
           Add New Stock
         </h1>
-        <p className="text-slate-400 text-sm">Real-time inventory entry system.</p>
+        <p className="text-slate-400 text-sm">Real-time inventory entry system. You can type a custom brand or model if not in the list.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -166,7 +194,6 @@ export default function AddMobile() {
                 value={formData.imei1}
                 onChange={(e) => {
                   handleInputChange(e);
-                  // Auto focus IMEI 2 after 15 chars (standard IMEI length)
                   if (e.target.value.length >= 15) {
                     imei2InputRef.current?.focus();
                   }
@@ -197,15 +224,22 @@ export default function AddMobile() {
 
             <div className="space-y-4">
               {/* Brand Combobox */}
-              <Combobox value={formData.brand} onChange={(val) => setFormData({...formData, brand: val, model: ''})}>
+              <Combobox value={formData.brand} onChange={(val) => setFormData({ ...formData, brand: val, model: '' })}>
                 <div className="relative">
-                  <Combobox.Label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Brand *</Combobox.Label>
+                  <Combobox.Label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">
+                    Brand *
+                    <span className="ml-2 text-slate-600 normal-case font-normal">(or type your own)</span>
+                  </Combobox.Label>
                   <div className="relative w-full cursor-default overflow-hidden rounded-lg bg-slate-800 text-left border border-slate-700">
                     <Combobox.Input
                       className="w-full border-none py-2.5 pl-3 pr-10 text-sm text-white bg-slate-800 focus:ring-0"
                       displayValue={(brand) => brand}
-                      onChange={(event) => setBrandQuery(event.target.value)}
-                      placeholder="Search Brand..."
+                      onChange={(event) => {
+                        setBrandQuery(event.target.value);
+                        // Update form data as user types (for custom brand)
+                        setFormData(prev => ({ ...prev, brand: event.target.value, model: '' }));
+                      }}
+                      placeholder="Search or type brand..."
                     />
                     <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
                       <ChevronDown className="h-5 w-5 text-slate-500" />
@@ -213,31 +247,55 @@ export default function AddMobile() {
                   </div>
                   <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0" afterLeave={() => setBrandQuery('')}>
                     <Combobox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-slate-800 py-1 shadow-2xl z-50 border border-slate-700">
-                      {filteredBrands.map((brand) => (
-                        <Combobox.Option key={brand} className={({ active }) => `relative cursor-default select-none py-2 pl-10 pr-4 ${active ? 'bg-primary-600 text-white' : 'text-slate-300'}`} value={brand}>
-                          {({ selected, active }) => (
-                            <>
-                              <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>{brand}</span>
-                              {selected && <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${active ? 'text-white' : 'text-primary-400'}`}><Check className="h-4 w-4" /></span>}
-                            </>
-                          )}
-                        </Combobox.Option>
-                      ))}
+                      {filteredBrands.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-slate-500 italic">No brands found.</div>
+                      ) : filteredBrands.map((brand) => {
+                        const isCustom = isCustomEntry(brand, Object.keys(MOBILE_DATA));
+                        return (
+                          <Combobox.Option
+                            key={brand}
+                            className={({ active }) => `relative cursor-default select-none py-2 pl-10 pr-4 ${active ? 'bg-primary-600 text-white' : 'text-slate-300'}`}
+                            value={brand}
+                          >
+                            {({ selected, active }) => (
+                              <>
+                                <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
+                                  {isCustom ? (
+                                    <span className="flex items-center gap-2">
+                                      <PenLine className="w-3 h-3 text-amber-400" />
+                                      <span className="text-amber-300">Use "{brand}"</span>
+                                      <span className="text-[10px] text-slate-500 ml-1">(custom)</span>
+                                    </span>
+                                  ) : brand}
+                                </span>
+                                {selected && <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${active ? 'text-white' : 'text-primary-400'}`}><Check className="h-4 w-4" /></span>}
+                              </>
+                            )}
+                          </Combobox.Option>
+                        );
+                      })}
                     </Combobox.Options>
                   </Transition>
                 </div>
               </Combobox>
 
               {/* Model Combobox */}
-              <Combobox value={formData.model} onChange={(val) => setFormData({...formData, model: val})}>
+              <Combobox value={formData.model} onChange={(val) => setFormData({ ...formData, model: val })}>
                 <div className="relative">
-                  <Combobox.Label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Model *</Combobox.Label>
+                  <Combobox.Label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">
+                    Model *
+                    <span className="ml-2 text-slate-600 normal-case font-normal">(or type your own)</span>
+                  </Combobox.Label>
                   <div className="relative w-full cursor-default overflow-hidden rounded-lg bg-slate-800 text-left border border-slate-700">
                     <Combobox.Input
                       className="w-full border-none py-2.5 pl-3 pr-10 text-sm text-white bg-slate-800 focus:ring-0"
                       displayValue={(model) => model}
-                      onChange={(event) => setModelQuery(event.target.value)}
-                      placeholder="Search Model..."
+                      onChange={(event) => {
+                        setModelQuery(event.target.value);
+                        // Update form data as user types (for custom model)
+                        setFormData(prev => ({ ...prev, model: event.target.value }));
+                      }}
+                      placeholder="Search or type model..."
                     />
                     <Combobox.Button className="absolute inset-y-0 right-0 flex items-center pr-2">
                       <ChevronDown className="h-5 w-5 text-slate-500" />
@@ -245,16 +303,33 @@ export default function AddMobile() {
                   </div>
                   <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0" afterLeave={() => setModelQuery('')}>
                     <Combobox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-slate-800 py-1 shadow-2xl z-50 border border-slate-700">
-                      {filteredModels.map((model, idx) => (
-                        <Combobox.Option key={idx} className={({ active }) => `relative cursor-default select-none py-2 pl-10 pr-4 ${active ? 'bg-primary-600 text-white' : 'text-slate-300'}`} value={model}>
-                          {({ selected, active }) => (
-                            <>
-                              <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>{model}</span>
-                              {selected && <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${active ? 'text-white' : 'text-primary-400'}`}><Check className="h-4 w-4" /></span>}
-                            </>
-                          )}
-                        </Combobox.Option>
-                      ))}
+                      {filteredModels.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-slate-500 italic">No models found.</div>
+                      ) : filteredModels.map((model, idx) => {
+                        const isCustom = isCustomEntry(model, currentModels);
+                        return (
+                          <Combobox.Option
+                            key={idx}
+                            className={({ active }) => `relative cursor-default select-none py-2 pl-10 pr-4 ${active ? 'bg-primary-600 text-white' : 'text-slate-300'}`}
+                            value={model}
+                          >
+                            {({ selected, active }) => (
+                              <>
+                                <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
+                                  {isCustom ? (
+                                    <span className="flex items-center gap-2">
+                                      <PenLine className="w-3 h-3 text-amber-400" />
+                                      <span className="text-amber-300">Use "{model}"</span>
+                                      <span className="text-[10px] text-slate-500 ml-1">(custom)</span>
+                                    </span>
+                                  ) : model}
+                                </span>
+                                {selected && <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${active ? 'text-white' : 'text-primary-400'}`}><Check className="h-4 w-4" /></span>}
+                              </>
+                            )}
+                          </Combobox.Option>
+                        );
+                      })}
                     </Combobox.Options>
                   </Transition>
                 </div>
@@ -280,7 +355,7 @@ export default function AddMobile() {
             </h3>
             <div className="space-y-4">
               {/* Supplier Combobox */}
-              <Combobox value={formData.supplierId} onChange={(val) => setFormData({...formData, supplierId: val})}>
+              <Combobox value={formData.supplierId} onChange={(val) => setFormData({ ...formData, supplierId: val })}>
                 <div className="relative">
                   <div className="flex items-center justify-between mb-1.5">
                     <Combobox.Label className="block text-xs font-bold text-slate-500 uppercase tracking-widest">Supplier *</Combobox.Label>
@@ -347,7 +422,7 @@ export default function AddMobile() {
           <Transition.Child as={Fragment} enter="ease-out duration-300" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-200" leaveFrom="opacity-100" leaveTo="opacity-0">
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
           </Transition.Child>
-          <div className="flex min-h-full items-center justify-center p-4">
+          <div className="fixed inset-0 flex min-h-full items-center justify-center p-4">
             <Transition.Child as={Fragment} enter="ease-out duration-300" enterFrom="opacity-0 scale-95" enterTo="opacity-100 scale-100" leave="ease-in duration-200" leaveFrom="opacity-100 scale-100" leaveTo="opacity-0 scale-95">
               <Dialog.Panel className="w-full max-w-md bg-slate-900 border border-slate-800 p-6 shadow-2xl rounded-2xl">
                 <div className="flex items-center justify-between mb-6">
@@ -355,8 +430,8 @@ export default function AddMobile() {
                   <button onClick={() => setIsSupplierModalOpen(false)}><X className="w-6 h-6 text-slate-500" /></button>
                 </div>
                 <form onSubmit={handleQuickAddSupplier} className="space-y-4">
-                  <input type="text" required placeholder="Name" className="input-field" value={newSupplier.name} onChange={(e) => setNewSupplier({...newSupplier, name: e.target.value})} />
-                  <input type="tel" placeholder="Phone" className="input-field" value={newSupplier.phone} onChange={(e) => setNewSupplier({...newSupplier, phone: e.target.value})} />
+                  <input type="text" required placeholder="Name" className="input-field" value={newSupplier.name} onChange={(e) => setNewSupplier({ ...newSupplier, name: e.target.value })} />
+                  <input type="tel" placeholder="Phone" className="input-field" value={newSupplier.phone} onChange={(e) => setNewSupplier({ ...newSupplier, phone: e.target.value })} />
                   <button type="submit" disabled={addingSupplier} className="btn-primary w-full py-3 mt-4">{addingSupplier ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Save Supplier'}</button>
                 </form>
               </Dialog.Panel>

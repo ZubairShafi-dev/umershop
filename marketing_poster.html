@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobiv ERP - Premium Retail Software</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Outfit', sans-serif; background-color: #030712; color: #f8fafc; }
+        .glow-text { text-shadow: 0 0 50px rgba(45, 212, 191, 0.5); }
+        .brand-gradient { background: linear-gradient(to right, #2dd4bf, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .glass-card { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(30px); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .ui-mockup { 
+            border: 8px solid #1e293b; 
+            box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.9); 
+            background: #020617; 
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+        .ui-mockup img { 
+            width: 100%; height: 100%; object-fit: cover; display: block; position: absolute; inset: 0; z-index: 50;
+        }
+        
+        /* Floating Animations */
+        .float-1 { animation: float 7s ease-in-out infinite; }
+        .float-2 { animation: float 8s ease-in-out infinite 1s; }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-30px); } }
+
+        /* BRIGHT Placeholder UI */
+        .placeholder-card { background: #1e293b; border-radius: 8px; height: 100%; }
+        .placeholder-line { height: 6px; background: #334155; border-radius: 3px; }
+        .placeholder-accent { background: #2dd4bf; opacity: 0.6; height: 8px; border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-screen overflow-hidden flex flex-col items-center justify-center py-8 px-16">
+
+    <!-- Background Decoration -->
+    <div class="fixed inset-0 pointer-events-none z-0">
+        <div class="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-teal-500/10 rounded-full blur-[150px]"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-blue-500/10 rounded-full blur-[150px]"></div>
+    </div>
+
+    <div class="max-w-[1600px] w-full grid grid-cols-1 lg:grid-cols-12 gap-16 items-center relative z-10">
+        
+        <!-- Left: Feature Section -->
+        <div class="lg:col-span-5 space-y-12">
+            <div class="space-y-4">
+                <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-[10px] font-black tracking-widest uppercase">
+                    <span class="w-2 h-2 rounded-full bg-teal-400 animate-ping"></span>
+                    Premium Retail ERP
+                </div>
+                <!-- Fixed Padding for Italic 'P' -->
+                <div class="inline-block" style="padding-right: 50px;">
+                    <h1 class="text-[120px] font-black tracking-tighter leading-[0.8] glow-text">
+                        MOBIV <span class="brand-gradient italic">ERP</span>
+                    </h1>
+                </div>
+                <p class="text-slate-500 font-black tracking-[0.6em] text-xs uppercase pl-2">
+                    Powered by <span class="text-slate-200">CodeEmpirez</span>
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-5 pr-10">
+                <div class="glass-card p-6 rounded-[2.5rem] border-l-4 border-teal-500 flex items-start gap-6">
+                    <div class="w-14 h-14 rounded-2xl bg-teal-500/10 flex items-center justify-center text-teal-400 shadow-xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    </div>
+                    <div><h4 class="font-bold text-xl text-white">Profit & Loss Reports</h4><p class="text-slate-500 text-sm">Real-time daily shop analytics.</p></div>
+                </div>
+                <div class="glass-card p-6 rounded-[2.5rem] border-l-4 border-blue-500 flex items-start gap-6">
+                    <div class="w-14 h-14 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-400 shadow-xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><path d="M7 15h.01"/><path d="M11 15h2"/></svg>
+                    </div>
+                    <div><h4 class="font-bold text-xl text-white">IMEI & POS System</h4><p class="text-slate-500 text-sm">Fast sales with thermal printing.</p></div>
+                </div>
+                <div class="glass-card p-6 rounded-[2.5rem] border-l-4 border-amber-500 flex items-start gap-6">
+                    <div class="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-400 shadow-xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                    </div>
+                    <div><h4 class="font-bold text-xl text-white">Kist Management</h4><p class="text-slate-500 text-sm">Dedicated udhaar/installment tracker.</p></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Spread Out Mockups -->
+        <div class="lg:col-span-7 relative h-[700px]">
+            
+            <!-- Dashboard Mockup (Top Right) -->
+            <div class="absolute top-[5%] right-[0%] w-[85%] z-10 float-1">
+                <div class="ui-mockup rounded-[2.5rem] aspect-[16/10] p-8">
+                    <!-- BRIGHT FAKE UI -->
+                    <div class="h-full flex flex-col gap-6">
+                        <div class="flex justify-between items-center"><div class="w-32 h-2 bg-slate-700 rounded"></div><div class="w-8 h-8 rounded-full bg-slate-700"></div></div>
+                        <div class="grid grid-cols-4 gap-4">
+                            <div class="placeholder-card p-4"><div class="w-full h-8 bg-teal-500/40 rounded mb-2"></div><div class="w-1/2 h-2 bg-slate-700"></div></div>
+                            <div class="placeholder-card p-4"><div class="w-full h-8 bg-blue-500/40 rounded mb-2"></div><div class="w-1/2 h-2 bg-slate-700"></div></div>
+                            <div class="placeholder-card p-4"><div class="w-full h-8 bg-amber-500/40 rounded mb-2"></div><div class="w-1/2 h-2 bg-slate-700"></div></div>
+                            <div class="placeholder-card p-4"><div class="w-full h-8 bg-rose-500/40 rounded mb-2"></div><div class="w-1/2 h-2 bg-slate-700"></div></div>
+                        </div>
+                        <div class="flex-1 bg-slate-800/50 rounded-2xl border border-slate-700 p-4">
+                             <div class="w-full h-full bg-gradient-to-t from-teal-500/30 to-transparent" style="clip-path: polygon(0 100%, 20% 70%, 40% 90%, 60% 40%, 80% 60%, 100% 20%, 100% 100%);"></div>
+                        </div>
+                    </div>
+                    <img src="dashboard.png" onerror="this.style.display='none'">
+                </div>
+                <div class="absolute -top-4 -right-4 bg-teal-500 text-black px-6 py-2 rounded-xl font-black text-xs uppercase shadow-2xl">Main Dashboard</div>
+            </div>
+
+            <!-- Inventory Mockup (Bottom Left - Pushed Further Left) -->
+            <div class="absolute bottom-[0%] left-[-15%] w-[75%] z-20 float-2 shadow-2xl">
+                <div class="ui-mockup rounded-[2.5rem] aspect-video p-8">
+                    <!-- BRIGHT FAKE UI -->
+                    <div class="h-full space-y-6">
+                        <div class="w-48 h-3 bg-slate-700 rounded mb-6"></div>
+                        <div class="space-y-4">
+                            <div class="flex justify-between p-4 bg-slate-800 rounded-2xl"><div class="w-1/2 h-2 bg-slate-600"></div><div class="w-12 h-4 bg-teal-500/50 rounded-full"></div></div>
+                            <div class="flex justify-between p-4 bg-slate-800 rounded-2xl"><div class="w-2/3 h-2 bg-slate-600"></div><div class="w-12 h-4 bg-teal-500/50 rounded-full"></div></div>
+                            <div class="flex justify-between p-4 bg-slate-800 rounded-2xl"><div class="w-1/2 h-2 bg-slate-600"></div><div class="w-12 h-4 bg-rose-500/50 rounded-full"></div></div>
+                        </div>
+                    </div>
+                    <img src="inventory.png" onerror="this.style.display='none'">
+                </div>
+                <div class="absolute -top-4 -left-4 bg-blue-600 text-white px-6 py-2 rounded-xl font-black text-xs uppercase shadow-2xl">Stock Manager</div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="w-full max-w-[1500px] relative z-10 pt-10">
+        <div class="glass-card p-12 rounded-[4rem] bg-gradient-to-r from-teal-500/10 via-slate-950/80 to-blue-500/10 flex flex-col lg:flex-row items-center justify-between gap-10 border-teal-500/30 shadow-2xl">
+            <div class="text-center lg:text-left">
+                <h3 class="text-5xl font-black text-white tracking-tighter">Ready to Grow?</h3>
+                <p class="text-slate-500 text-lg font-medium">Modernize your retail business with Mobiv ERP.</p>
+            </div>
+            
+            <div class="flex flex-col sm:flex-row items-center gap-12">
+                <div class="flex flex-col items-center lg:items-end">
+                    <span class="text-xs font-bold text-teal-400 uppercase tracking-[0.4em] mb-2">Book Free Demo</span>
+                    <a href="tel:+923021154242" class="text-6xl font-black text-white hover:text-teal-400 transition-colors tracking-tighter">+92 302 1154 242</a>
+                </div>
+                <div class="h-20 w-px bg-slate-800 hidden sm:block"></div>
+                <div class="flex flex-col items-center lg:items-start">
+                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Developed By</span>
+                    <p class="text-3xl font-black text-white">CodeEmpire<span class="text-teal-400 text-4xl">z</span></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-8 flex justify-between items-center text-[10px] font-bold text-slate-700 uppercase tracking-[0.5em]">
+            <div class="flex gap-6"><span>CLOUD SYNC</span><span>THERMAL POS</span><span>P&L ANALYTICS</span></div>
+            <span>© 2026 MOBIV ERP · POWERED BY CODEEMPIREZ</span>
+        </div>
+    </div>
+
+</body>
+</html>
