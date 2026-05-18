@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, orderBy, doc, updateDoc, getDoc, setDoc, arrayUnion } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, getDoc, setDoc, arrayUnion, deleteDoc } from 'firebase/firestore';
 import { 
   Smartphone, 
   Search, 
@@ -15,7 +15,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   Clock,
-  Filter
+  Filter,
+  Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
@@ -258,6 +259,22 @@ export default function Inventory() {
     }
   };
 
+  const handleDelete = async (item) => {
+    const confirmMessage = item.type === 'mobile' 
+      ? `Delete mobile: ${item.brand} ${item.model} (${item.imei1 || item.imei})?`
+      : `Delete accessory: ${item.name}?`;
+
+    if (window.confirm(confirmMessage)) {
+      try {
+        const collectionName = item.type === 'mobile' ? 'mobiles' : 'accessories';
+        await deleteDoc(doc(db, collectionName, item.id));
+        toast.success("Item deleted successfully!");
+      } catch (error) {
+        toast.error("Delete failed: " + error.message);
+      }
+    }
+  };
+
   const filteredItems = (() => {
     let combined = [];
     if (typeFilter === 'all' || typeFilter === 'mobile') combined = [...combined, ...mobiles];
@@ -395,6 +412,7 @@ export default function Inventory() {
                       <div className="flex items-center justify-end gap-1.5">
                         <button onClick={() => { setSelectedItem(item); setIsDetailModalOpen(true); }} className="p-2 text-slate-400 hover:text-primary-400 hover:bg-slate-800 rounded-lg transition-all" title="View Details"><Eye className="w-4 h-4" /></button>
                         <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-all" title="Edit Item"><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => handleDelete(item)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-slate-800 rounded-lg transition-all" title="Delete Item"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </td>
                   </tr>
