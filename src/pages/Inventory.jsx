@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc, updateDoc, getDoc, setDoc, arrayUnion } from 'firebase/firestore';
 import { 
   Smartphone, 
   Search, 
@@ -20,6 +20,33 @@ import {
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+
+const MOBILE_DATA = {
+  'Samsung': ['Galaxy S24 Ultra', 'Galaxy S24+', 'Galaxy S24', 'Galaxy S23 FE', 'Galaxy A54', 'Galaxy A34', 'Galaxy M54', 'Galaxy Z Fold 5', 'Galaxy Z Flip 5'],
+  'Apple': ['iPhone 15 Pro Max', 'iPhone 15 Pro', 'iPhone 15 Plus', 'iPhone 15', 'iPhone 14', 'iPhone 13', 'iPhone SE (2022)'],
+  'Vivo': ['V29 Pro', 'V29', 'V29e', 'Y100', 'Y17s', 'Y27', 'X100 Pro', 'X100'],
+  'Oppo': ['Reno 10 Pro+', 'Reno 10', 'F23', 'A78', 'A58', 'Find N3 Flip'],
+  'Xiaomi': ['Redmi Note 13 Pro+', 'Redmi Note 13', 'Redmi 12', 'Xiaomi 13T Pro', 'Xiaomi 13 Ultra', 'Poco F5'],
+  'Realme': ['Realme 11 Pro+', 'Realme 11', 'Realme C55', 'Realme C53', 'GT Neo 5'],
+  'Infinix': ['Note 30 Pro', 'Note 30', 'Hot 30', 'Zero 30 5G', 'Smart 7'],
+  'Tecno': ['Camon 20 Premier', 'Camon 20', 'Spark 10 Pro', 'Phantom V Fold'],
+  'Google': ['Pixel 8 Pro', 'Pixel 8', 'Pixel 7a', 'Pixel 7 Pro', 'Pixel Fold'],
+  'OnePlus': ['OnePlus 12', 'OnePlus 11', 'OnePlus Nord CE 3', 'OnePlus Nord 3'],
+  'Nokia': ['Nokia G42', 'Nokia C32', 'Nokia G21'],
+  'Motorola': ['Moto G84', 'Moto G54', 'Moto Edge 40'],
+};
+
+const CATEGORIES = [
+  'Chargers',
+  'Cables',
+  'Headphones',
+  'Cases/Covers',
+  'Protectors',
+  'Power Banks',
+  'Smart Watches',
+  'Batteries',
+  'Other'
+];
 
 const STATUS_COLORS = {
   'Available': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
@@ -41,6 +68,12 @@ export default function Inventory() {
   
   const [selectedItem, setSelectedItem] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  const [customBrands, setCustomBrands] = useState({});
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [submittingEdit, setSubmittingEdit] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -65,12 +98,153 @@ export default function Inventory() {
       setLoading(false);
     });
 
+    // Real-time Mobile Brands (Custom Dropdown options)
+    const unsubBrands = onSnapshot(collection(db, 'mobile_brands'), (snapshot) => {
+      const data = {};
+      snapshot.forEach(doc => {
+        data[doc.id] = doc.data().models || [];
+      });
+      setCustomBrands(data);
+    });
+
     return () => {
       unsubSuppliers();
       unsubMobiles();
       unsubAccessories();
+      unsubBrands();
     };
   }, []);
+
+  const customBrandKeys = Object.keys(customBrands).filter(b => b);
+  const builtInBrandKeys = Object.keys(MOBILE_DATA).filter(b => !customBrands[b]);
+  const brandList = [...customBrandKeys, ...builtInBrandKeys];
+
+  const currentModels = editFormData.brand
+    ? [
+        ...(customBrands[editFormData.brand] || []),
+        ...(MOBILE_DATA[editFormData.brand] || [])
+      ].filter((v, i, a) => a.indexOf(v) === i)
+    : [
+        ...Object.values(customBrands).flat(),
+        ...Object.values(MOBILE_DATA).flat()
+      ].filter((v, i, a) => a.indexOf(v) === i);
+
+  const accessoryCategories = [...new Set([...CATEGORIES, ...accessories.map(a => a.category).filter(Boolean)])].sort();
+
+  const handleEdit = (item) => {
+    setEditItem(item);
+    if (item.type === 'mobile') {
+      setEditFormData({
+        brand: item.brand || '',
+        model: item.model || '',
+        imei1: item.imei1 || item.imei || '',
+        imei2: item.imei2 || '',
+        ramStorage: item.ramStorage || '',
+        color: item.color || '',
+        purchasePrice: item.purchasePrice ? item.purchasePrice.toString() : '',
+        sellingPrice: item.sellingPrice ? item.sellingPrice.toString() : '',
+        supplierId: item.supplierId || '',
+        warranty: item.warranty || '1 Year Local',
+        notes: item.notes || '',
+        status: item.status || 'Available'
+      });
+    } else {
+      setEditFormData({
+        name: item.name || '',
+        category: item.category || 'Other',
+        barcode: item.barcode || '',
+        purchasePrice: item.purchasePrice ? item.purchasePrice.toString() : '',
+        sellingPrice: item.sellingPrice ? item.sellingPrice.toString() : '',
+        quantity: item.quantity ? item.quantity.toString() : '0',
+        minStock: item.minStock ? item.minStock.toString() : '5'
+      });
+    }
+    setIsEditModalOpen(true);
+  };
+
+  const saveCustomBrandModel = async (brand, model) => {
+    if (!brand || !model) return;
+    try {
+      const brandRef = doc(db, 'mobile_brands', brand);
+      const brandSnap = await getDoc(brandRef);
+      if (brandSnap.exists()) {
+        await updateDoc(brandRef, {
+          models: arrayUnion(model)
+        });
+      } else {
+        await setDoc(brandRef, {
+          models: [model]
+        });
+      }
+    } catch (error) {
+      console.error("Error saving custom brand/model:", error);
+    }
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editItem) return;
+
+    try {
+      setSubmittingEdit(true);
+
+      if (editItem.type === 'mobile') {
+        const updateData = {
+          brand: editFormData.brand,
+          model: editFormData.model,
+          imei1: editFormData.imei1,
+          imei2: editFormData.imei2,
+          ramStorage: editFormData.ramStorage,
+          color: editFormData.color,
+          sellingPrice: parseFloat(editFormData.sellingPrice),
+          warranty: editFormData.warranty,
+          notes: editFormData.notes,
+          status: editFormData.status,
+          updatedAt: new Date().toISOString()
+        };
+
+        if (isAdmin && editFormData.purchasePrice) {
+          updateData.purchasePrice = parseFloat(editFormData.purchasePrice);
+        }
+
+        await updateDoc(doc(db, 'mobiles', editItem.id), updateData);
+
+        // Handle custom brand/model saving
+        const isBuiltInBrand = Object.keys(MOBILE_DATA).includes(editFormData.brand);
+        const isBuiltInModel = isBuiltInBrand && MOBILE_DATA[editFormData.brand].includes(editFormData.model);
+
+        if (!isBuiltInBrand || !isBuiltInModel) {
+          await saveCustomBrandModel(editFormData.brand, editFormData.model);
+        }
+
+        toast.success("Mobile details updated!");
+      } else {
+        const updateData = {
+          name: editFormData.name,
+          category: editFormData.category,
+          barcode: editFormData.barcode,
+          sellingPrice: parseFloat(editFormData.sellingPrice),
+          quantity: parseInt(editFormData.quantity),
+          minStock: parseInt(editFormData.minStock),
+          updatedAt: new Date().toISOString()
+        };
+
+        if (isAdmin && editFormData.purchasePrice) {
+          updateData.purchasePrice = parseFloat(editFormData.purchasePrice);
+        }
+
+        await updateDoc(doc(db, 'accessories', editItem.id), updateData);
+        toast.success("Accessory details updated!");
+      }
+
+      setIsEditModalOpen(false);
+      setEditItem(null);
+    } catch (error) {
+      toast.error("Failed to update item: " + error.message);
+    } finally {
+      setSubmittingEdit(false);
+    }
+  };
 
   const updateStatus = async (itemId, newStatus, itemType) => {
     try {
@@ -218,7 +392,10 @@ export default function Inventory() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button onClick={() => { setSelectedItem(item); setIsDetailModalOpen(true); }} className="p-2 text-slate-400 hover:text-primary-400 hover:bg-slate-800 rounded-lg transition-all"><Eye className="w-4 h-4" /></button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button onClick={() => { setSelectedItem(item); setIsDetailModalOpen(true); }} className="p-2 text-slate-400 hover:text-primary-400 hover:bg-slate-800 rounded-lg transition-all" title="View Details"><Eye className="w-4 h-4" /></button>
+                        <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-all" title="Edit Item"><Edit2 className="w-4 h-4" /></button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -286,6 +463,254 @@ export default function Inventory() {
             <div className="p-6 bg-slate-800/20 border-t border-slate-800 flex justify-end">
                <button onClick={() => setIsDetailModalOpen(false)} className="btn-secondary px-6 py-2 text-xs font-bold">Close Details</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {isEditModalOpen && editItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="card w-full max-w-2xl bg-slate-900 border-slate-700 shadow-2xl animate-in zoom-in duration-200">
+            <div className="flex items-center justify-between p-6 border-b border-slate-800">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Edit2 className="w-5 h-5 text-amber-400" />
+                {editItem.type === 'mobile' ? 'Edit Mobile Stock' : 'Edit Accessory Stock'}
+              </h3>
+              <button onClick={() => setIsEditModalOpen(false)} className="p-1 hover:bg-slate-800 rounded-lg transition-colors"><X className="w-5 h-5 text-slate-500" /></button>
+            </div>
+            
+            <form onSubmit={handleSaveEdit}>
+              <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                {editItem.type === 'mobile' ? (
+                  /* Mobile Form Fields */
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Brand</label>
+                      <input 
+                        type="text" 
+                        required 
+                        list="edit-brands" 
+                        className="input-field" 
+                        value={editFormData.brand} 
+                        onChange={e => setEditFormData({ ...editFormData, brand: e.target.value, model: '' })} 
+                        placeholder="Search or type brand..."
+                      />
+                      <datalist id="edit-brands">
+                        {brandList.map(b => <option key={b} value={b} />)}
+                      </datalist>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Model</label>
+                      <input 
+                        type="text" 
+                        required 
+                        list="edit-models" 
+                        className="input-field" 
+                        value={editFormData.model} 
+                        onChange={e => setEditFormData({ ...editFormData, model: e.target.value })} 
+                        placeholder="Search or type model..."
+                      />
+                      <datalist id="edit-models">
+                        {currentModels.map((m, idx) => <option key={idx} value={m} />)}
+                      </datalist>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">IMEI 1 (Primary)</label>
+                      <input 
+                        type="text" 
+                        required 
+                        className="input-field font-mono" 
+                        value={editFormData.imei1} 
+                        onChange={e => setEditFormData({ ...editFormData, imei1: e.target.value })} 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">IMEI 2 (Optional)</label>
+                      <input 
+                        type="text" 
+                        className="input-field font-mono" 
+                        value={editFormData.imei2} 
+                        onChange={e => setEditFormData({ ...editFormData, imei2: e.target.value })} 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">RAM/Storage</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. 8/128GB" 
+                        className="input-field" 
+                        value={editFormData.ramStorage} 
+                        onChange={e => setEditFormData({ ...editFormData, ramStorage: e.target.value })} 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Color</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. Black" 
+                        className="input-field" 
+                        value={editFormData.color} 
+                        onChange={e => setEditFormData({ ...editFormData, color: e.target.value })} 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Cost Price (Rs.)</label>
+                      <input 
+                        type="number" 
+                        required 
+                        disabled={!isAdmin} 
+                        className="input-field disabled:opacity-50" 
+                        value={isAdmin ? editFormData.purchasePrice : '999999'} 
+                        onChange={e => setEditFormData({ ...editFormData, purchasePrice: e.target.value })} 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Selling Price (Rs.)</label>
+                      <input 
+                        type="number" 
+                        required 
+                        className="input-field font-bold text-emerald-400" 
+                        value={editFormData.sellingPrice} 
+                        onChange={e => setEditFormData({ ...editFormData, sellingPrice: e.target.value })} 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Warranty</label>
+                      <input 
+                        type="text" 
+                        className="input-field" 
+                        value={editFormData.warranty} 
+                        onChange={e => setEditFormData({ ...editFormData, warranty: e.target.value })} 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Status</label>
+                      <select 
+                        className="input-field" 
+                        value={editFormData.status} 
+                        onChange={e => setEditFormData({ ...editFormData, status: e.target.value })}
+                      >
+                        <option value="Available">Available</option>
+                        <option value="Sold">Sold</option>
+                        <option value="Faulty">Faulty</option>
+                        <option value="Reserved">Reserved</option>
+                      </select>
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Notes</label>
+                      <textarea 
+                        rows="2" 
+                        placeholder="Device condition, box, charger..." 
+                        className="input-field py-2" 
+                        value={editFormData.notes} 
+                        onChange={e => setEditFormData({ ...editFormData, notes: e.target.value })} 
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* Accessory Form Fields */
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="col-span-2">
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Item Name</label>
+                      <input 
+                        type="text" 
+                        required 
+                        className="input-field" 
+                        value={editFormData.name} 
+                        onChange={e => setEditFormData({ ...editFormData, name: e.target.value })} 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Category</label>
+                      <input 
+                        type="text" 
+                        required 
+                        list="edit-categories" 
+                        className="input-field" 
+                        value={editFormData.category} 
+                        onChange={e => setEditFormData({ ...editFormData, category: e.target.value })} 
+                      />
+                      <datalist id="edit-categories">
+                        {accessoryCategories.map(cat => <option key={cat} value={cat} />)}
+                      </datalist>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Barcode / SKU</label>
+                      <input 
+                        type="text" 
+                        required 
+                        className="input-field font-mono" 
+                        value={editFormData.barcode} 
+                        onChange={e => setEditFormData({ ...editFormData, barcode: e.target.value })} 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Cost Price (Rs.)</label>
+                      <input 
+                        type="number" 
+                        required 
+                        disabled={!isAdmin} 
+                        className="input-field disabled:opacity-50" 
+                        value={isAdmin ? editFormData.purchasePrice : '999999'} 
+                        onChange={e => setEditFormData({ ...editFormData, purchasePrice: e.target.value })} 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Selling Price (Rs.)</label>
+                      <input 
+                        type="number" 
+                        required 
+                        className="input-field font-bold text-emerald-400" 
+                        value={editFormData.sellingPrice} 
+                        onChange={e => setEditFormData({ ...editFormData, sellingPrice: e.target.value })} 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Stock Quantity</label>
+                      <input 
+                        type="number" 
+                        required 
+                        className="input-field" 
+                        value={editFormData.quantity} 
+                        onChange={e => setEditFormData({ ...editFormData, quantity: e.target.value })} 
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Min Stock Alert</label>
+                      <input 
+                        type="number" 
+                        required 
+                        className="input-field" 
+                        value={editFormData.minStock} 
+                        onChange={e => setEditFormData({ ...editFormData, minStock: e.target.value })} 
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 bg-slate-800/20 border-t border-slate-800 flex justify-end gap-3">
+                <button type="button" onClick={() => setIsEditModalOpen(false)} className="btn-secondary px-6 py-2 text-xs font-bold">Cancel</button>
+                <button type="submit" disabled={submittingEdit} className="btn-primary px-6 py-2 text-xs font-bold flex items-center gap-1.5">
+                  {submittingEdit ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

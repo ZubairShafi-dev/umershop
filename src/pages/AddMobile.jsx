@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, Fragment } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, getDocs, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, orderBy, onSnapshot, doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { 
   PlusCircle, 
   Smartphone, 
@@ -43,6 +43,7 @@ export default function AddMobile() {
   const [brandQuery, setBrandQuery] = useState('');
   const [modelQuery, setModelQuery] = useState('');
   const [supplierQuery, setSupplierQuery] = useState('');
+  const [customBrands, setCustomBrands] = useState({});
   
   const imei1InputRef = useRef(null);
   const imei2InputRef = useRef(null);
@@ -68,31 +69,71 @@ export default function AddMobile() {
 
   useEffect(() => {
     const q = query(collection(db, 'suppliers'), orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribeSuppliers = onSnapshot(q, (snapshot) => {
       setSuppliers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoadingSuppliers(false);
     });
 
+    const unsubscribeBrands = onSnapshot(collection(db, 'mobile_brands'), (snapshot) => {
+      const data = {};
+      snapshot.forEach(doc => {
+        data[doc.id] = doc.data().models || [];
+      });
+      setCustomBrands(data);
+    });
+
     if (imei1InputRef.current) imei1InputRef.current.focus();
-    return () => unsubscribe();
+    return () => {
+      unsubscribeSuppliers();
+      unsubscribeBrands();
+    };
   }, []);
+
+  const saveCustomBrandModel = async (brand, model) => {
+    if (!brand || !model) return;
+    try {
+      const brandRef = doc(db, 'mobile_brands', brand);
+      const brandSnap = await getDoc(brandRef);
+      if (brandSnap.exists()) {
+        await updateDoc(brandRef, {
+          models: arrayUnion(model)
+        });
+      } else {
+        await setDoc(brandRef, {
+          models: [model]
+        });
+      }
+    } catch (error) {
+      console.error("Error saving custom brand/model:", error);
+    }
+  };
+
+  const customBrandKeys = Object.keys(customBrands).filter(b => b);
+  const builtInBrandKeys = Object.keys(MOBILE_DATA).filter(b => !customBrands[b]);
+  const brandList = [...customBrandKeys, ...builtInBrandKeys];
 
   // Filter brands — show typed value as first custom option if it doesn't match
   const filteredBrands = brandQuery === ''
-    ? Object.keys(MOBILE_DATA)
+    ? brandList
     : [
-        ...Object.keys(MOBILE_DATA).filter(brand =>
+        ...brandList.filter(brand =>
           brand.toLowerCase().includes(brandQuery.toLowerCase())
         ),
         // Add the typed value as a custom option if not already in list
-        ...(Object.keys(MOBILE_DATA).some(b => b.toLowerCase() === brandQuery.toLowerCase())
+        ...(brandList.some(b => b.toLowerCase() === brandQuery.toLowerCase())
           ? []
           : [brandQuery])
       ];
 
-  const currentModels = formData.brand && MOBILE_DATA[formData.brand]
-    ? MOBILE_DATA[formData.brand]
-    : Object.values(MOBILE_DATA).flat();
+  const currentModels = formData.brand
+    ? [
+        ...(customBrands[formData.brand] || []),
+        ...(MOBILE_DATA[formData.brand] || [])
+      ].filter((v, i, a) => a.indexOf(v) === i)
+    : [
+        ...Object.values(customBrands).flat(),
+        ...Object.values(MOBILE_DATA).flat()
+      ].filter((v, i, a) => a.indexOf(v) === i);
 
   // Filter models — show typed value as first custom option if it doesn't match
   const filteredModels = modelQuery === ''
@@ -148,6 +189,15 @@ export default function AddMobile() {
         status: 'Available',
         createdAt: new Date().toISOString()
       });
+
+      // Check if brand or model is custom (not in built-in MOBILE_DATA)
+      const isBuiltInBrand = Object.keys(MOBILE_DATA).includes(formData.brand);
+      const isBuiltInModel = isBuiltInBrand && MOBILE_DATA[formData.brand].includes(formData.model);
+
+      if (!isBuiltInBrand || !isBuiltInModel) {
+        await saveCustomBrandModel(formData.brand, formData.model);
+      }
+
       toast.success("Mobile added!");
       setFormData(initialFormState);
       setBrandQuery('');

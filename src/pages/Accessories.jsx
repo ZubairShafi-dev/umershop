@@ -90,6 +90,10 @@ export default function Accessories() {
   // Build a dynamic category list combining predefined + any custom ones from data
   const allCategories = [...new Set([...CATEGORIES, ...accessories.map(a => a.category).filter(Boolean)])].sort();
 
+  // Extract custom categories that aren't part of standard predefined CATEGORIES
+  const customCategories = [...new Set(accessories.map(a => a.category).filter(cat => cat && !CATEGORIES.includes(cat)))].sort();
+  const suggestions = [...customCategories, ...CATEGORIES];
+
   const handleOpenModal = (item = null) => {
     if (item) {
       setCurrentAccessory(item);
@@ -299,7 +303,7 @@ export default function Accessories() {
                     placeholder="Select or type category..."
                   />
                   <datalist id="category-suggestions">
-                    {CATEGORIES.map(cat => <option key={cat} value={cat} />)}
+                    {suggestions.map(cat => <option key={cat} value={cat} />)}
                   </datalist>
                 </div>
                 <div>
