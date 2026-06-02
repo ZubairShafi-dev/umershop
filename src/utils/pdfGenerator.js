@@ -20,7 +20,7 @@ export function generateSalePdf(sale) {
   doc.setTextColor(80, 80, 80);
   doc.text(`Date: ${formatTimestamp(sale.soldAt)}`, 14, 32);
   doc.text('Contact: 0300-6317013', 14, 40);
-  doc.text(`Customer: ${sale.customerName || 'N/A'}`, 14, 40);
+  doc.text(`Customer: ${sale.customerName || 'N/A'}`, 14, 48);
 
   // Items table
   const rows = (sale.items || []).map(item => [
@@ -33,16 +33,19 @@ export function generateSalePdf(sale) {
   autoTable(doc, {
     head: [['Item', 'Qty', 'Unit Price', 'Subtotal']],
     body: rows,
-    startY: 50,
+    startY: 60,
     styles: { fontSize: 10 },
     headStyles: { fillColor: [30, 41, 59] },
   });
 
-  const finalY = doc.lastAutoTable?.finalY ?? 50;
+  const finalY = doc.lastAutoTable?.finalY ?? 60;
+  // Compute total and profit if not provided
+  const total = sale.totalPrice ?? rows.reduce((sum, r) => sum + parseFloat(r[3].replace('Rs. ', '').replace(/,/g, '')), 0);
+  const profit = sale.totalProfit ?? (sale.totalPrice ? sale.totalPrice - (sale.totalCost || 0) : 0);
   doc.setFontSize(12);
   doc.setTextColor(40, 40, 40);
-  doc.text(`Total:  Rs. ${sale.totalPrice?.toLocaleString() ?? '0'}`, 14, finalY + 12);
-  doc.text(`Profit: Rs. ${sale.totalProfit?.toLocaleString() ?? '0'}`, 14, finalY + 20);
+  doc.text(`Total:  Rs. ${total?.toLocaleString() ?? '0'}`, 14, finalY + 12);
+  doc.text(`Profit: Rs. ${profit?.toLocaleString() ?? '0'}`, 14, finalY + 20);
 
   doc.save(`sale_${sale.id}.pdf`);
 }
