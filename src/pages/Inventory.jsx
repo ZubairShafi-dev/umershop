@@ -250,7 +250,10 @@ export default function Inventory() {
   const updateStatus = async (itemId, newStatus, itemType) => {
     try {
       if (itemType === 'mobile') {
-        await updateDoc(doc(db, 'mobiles', itemId), { status: newStatus });
+        await updateDoc(doc(db, 'mobiles', itemId), { 
+          status: newStatus,
+          updatedAt: new Date().toISOString()
+        });
       }
       toast.success(`Status updated!`);
       setIsDetailModalOpen(false);
@@ -292,6 +295,19 @@ export default function Inventory() {
     });
   })();
 
+  const availableMobiles = mobiles.filter(m => m.status === 'Available');
+  const mobileStockCount = availableMobiles.length;
+  const accessoryStockCount = accessories.reduce((sum, a) => sum + (a.quantity || 0), 0);
+
+  const mobileStockCost = availableMobiles.reduce((sum, m) => sum + (parseFloat(m.purchasePrice) || 0), 0);
+  const mobileStockSaleValue = availableMobiles.reduce((sum, m) => sum + (parseFloat(m.sellingPrice) || 0), 0);
+
+  const accessoryStockCost = accessories.reduce((sum, a) => sum + ((parseFloat(a.purchasePrice) || 0) * (parseInt(a.quantity) || 0)), 0);
+  const accessoryStockSaleValue = accessories.reduce((sum, a) => sum + ((parseFloat(a.sellingPrice) || 0) * (parseInt(a.quantity) || 0)), 0);
+
+  const totalStockCost = mobileStockCost + accessoryStockCost;
+  const totalStockSaleValue = mobileStockSaleValue + accessoryStockSaleValue;
+
   return (
     <div className="space-y-6 pb-10">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -308,6 +324,28 @@ export default function Inventory() {
           <Link to="/accessories" className="btn-primary py-2 px-4 flex items-center gap-2 text-sm">
             <Plus className="w-4 h-4" /> Add Accessory
           </Link>
+        </div>
+      </div>
+
+      {/* Inventory Stats Summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="card p-4 bg-slate-900/30 border-slate-800 flex flex-col justify-between">
+          <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1">Mobiles Stock</p>
+          <p className="text-xl font-bold text-white">{mobileStockCount} Units</p>
+        </div>
+        <div className="card p-4 bg-slate-900/30 border-slate-800 flex flex-col justify-between">
+          <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1">Accessories Stock</p>
+          <p className="text-xl font-bold text-white">{accessoryStockCount} Items</p>
+        </div>
+        {isAdmin && (
+          <div className="card p-4 bg-slate-900/30 border-slate-800 flex flex-col justify-between">
+            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1">Stock Value (Cost)</p>
+            <p className="text-xl font-bold text-rose-400">Rs. {totalStockCost.toLocaleString()}</p>
+          </div>
+        )}
+        <div className="card p-4 bg-slate-900/30 border-slate-800 flex flex-col justify-between">
+          <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1">Stock Value (Selling)</p>
+          <p className="text-xl font-bold text-emerald-400">Rs. {totalStockSaleValue.toLocaleString()}</p>
         </div>
       </div>
 
@@ -398,9 +436,16 @@ export default function Inventory() {
                     <td className="px-6 py-4 text-right text-sm text-white font-bold">Rs. {item.sellingPrice.toLocaleString()}</td>
                     <td className="px-6 py-4 text-center">
                       {item.type === 'mobile' ? (
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase border ${STATUS_COLORS[item.status] || STATUS_COLORS['Available']}`}>
-                          {item.status}
-                        </span>
+                        <div className="flex flex-col items-center">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase border ${STATUS_COLORS[item.status] || STATUS_COLORS['Available']}`}>
+                            {item.status}
+                          </span>
+                          {item.status === 'Sold' && item.updatedAt && (
+                            <span className="text-[9px] text-slate-500 mt-1 font-medium">
+                              {new Date(item.updatedAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })}
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <div className="flex flex-col items-center">
                            <span className={`text-xs font-bold ${item.quantity <= 5 ? 'text-rose-400' : 'text-emerald-400'}`}>{item.quantity} In Stock</span>
@@ -440,6 +485,17 @@ export default function Inventory() {
                     </div>
                     <div><p className="text-slate-500 text-[10px] font-bold uppercase mb-1">Color</p><p className="text-white">{selectedItem.color}</p></div>
                     <div><p className="text-slate-500 text-[10px] font-bold uppercase mb-1">Supplier</p><p className="text-white text-xs">{suppliers[selectedItem.supplierId] || 'Direct'}</p></div>
+                    {selectedItem.status === 'Sold' && (
+                      <div className="col-span-2 pt-2 border-t border-slate-800/50">
+                        <p className="text-rose-400 text-[10px] font-bold uppercase mb-1">Sold Date & Time</p>
+                        <p className="text-white text-xs font-semibold">
+                          {selectedItem.updatedAt ? new Date(selectedItem.updatedAt).toLocaleString('en-PK', {
+                            dateStyle: 'medium',
+                            timeStyle: 'short'
+                          }) : 'N/A'}
+                        </p>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>

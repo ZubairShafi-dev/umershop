@@ -17,16 +17,14 @@ import Settings from './pages/Settings';
 import Accessories from './pages/Accessories';
 import Expenses from './pages/Expenses';
 import Installments from './pages/Installments';
-import SuspendedScreen from './components/SuspendedScreen';
+
 
 // Change to true to manually activate the suspension screen,
 // or configure it via the VITE_APP_SUSPENDED=true environment variable in Vercel.
 const IS_SUSPENDED = import.meta.env.VITE_APP_SUSPENDED === 'true' || false;
 
 function App() {
-  if (IS_SUSPENDED) {
-    return <SuspendedScreen />;
-  }
+
 
   return (
     <AuthProvider>

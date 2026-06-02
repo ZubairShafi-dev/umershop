@@ -33,81 +33,70 @@ const StatCard = ({ title, value, icon: Icon, color }) => (
   </div>
 );
 
+const formatSaleDate = (dateStr) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+  if (date.toDateString() === today.toDateString()) {
+    return `Today, ${timeStr}`;
+  } else if (date.toDateString() === yesterday.toDateString()) {
+    return `Yesterday, ${timeStr}`;
+  } else {
+    return `${date.toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })}, ${timeStr}`;
+  }
+};
+
 export default function Dashboard() {
   const { userRole } = useAuth();
   const isAdmin = userRole === 'admin';
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    mobileStock: 0,
-    accessoryStock: 0,
-    soldToday: 0,
-    totalRevenue: 0,
-    totalProfit: 0
-  });
-  const [distributionData, setDistributionData] = useState([]);
-  const [recentSales, setRecentSales] = useState([]);
+  const [mobiles, setMobiles] = useState([]);
+  const [accessories, setAccessories] = useState([]);
+  const [sales, setSales] = useState([]);
 
   useEffect(() => {
     setLoading(true);
-    
+    let mobilesLoaded = false;
+    let accessoriesLoaded = false;
+    let salesLoaded = false;
+
+    const checkLoading = () => {
+      if (mobilesLoaded && accessoriesLoaded && salesLoaded) {
+        setLoading(false);
+      }
+    };
+
     // 1. Listen to Mobiles
     const unsubscribeMobiles = onSnapshot(collection(db, 'mobiles'), (snapshot) => {
-      const mobiles = snapshot.docs.map(doc => doc.data());
-      const available = mobiles.filter(m => m.status === 'Available');
-      
-      const brands = available.reduce((acc, m) => {
-        acc[m.brand] = (acc[m.brand] || 0) + 1;
-        return acc;
-      }, {});
-      
-      const distData = Object.keys(brands).map(name => ({
-        name,
-        value: brands[name]
-      }));
-      
-      setDistributionData(distData.length > 0 ? distData : [{ name: 'No Stock', value: 0 }]);
-      setStats(prev => ({ ...prev, mobileStock: available.length }));
+      setMobiles(snapshot.docs.map(doc => doc.data()));
+      mobilesLoaded = true;
+      checkLoading();
+    }, (error) => {
+      console.error("Error loading mobiles:", error);
     });
 
     // 2. Listen to Accessories
     const unsubscribeAccessories = onSnapshot(collection(db, 'accessories'), (snapshot) => {
-      const total = snapshot.docs.reduce((sum, doc) => sum + (doc.data().quantity || 0), 0);
-      setStats(prev => ({ ...prev, accessoryStock: total }));
+      setAccessories(snapshot.docs.map(doc => doc.data()));
+      accessoriesLoaded = true;
+      checkLoading();
+    }, (error) => {
+      console.error("Error loading accessories:", error);
     });
 
     // 3. Listen to Sales
     const qSales = query(collection(db, 'sales'), orderBy('soldAt', 'desc'));
     const unsubscribeSales = onSnapshot(qSales, (snapshot) => {
-      const sales = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const today = new Date().toDateString();
-      
-      let totalRevenue = 0;
-      let totalProfit = 0;
-      let soldToday = 0;
-
-      sales.forEach(s => {
-        const amount = (s.totalAmount || s.salePrice || 0);
-        const profit = (s.totalProfit || s.profit || 0);
-        totalRevenue += amount;
-        totalProfit += profit;
-        
-        if (new Date(s.soldAt).toDateString() === today) {
-           if (s.items) {
-             s.items.forEach(item => soldToday += item.qty);
-           } else {
-             soldToday += 1;
-           }
-        }
-      });
-
-      setStats(prev => ({
-        ...prev,
-        soldToday,
-        totalRevenue,
-        totalProfit
-      }));
-      setRecentSales(sales.slice(0, 5));
-      setLoading(false);
+      setSales(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      salesLoaded = true;
+      checkLoading();
+    }, (error) => {
+      console.error("Error loading sales:", error);
     });
 
     return () => {
@@ -116,6 +105,86 @@ export default function Dashboard() {
       unsubscribeSales();
     };
   }, []);
+
+  const availableMobiles = mobiles.filter(m => m.status === 'Available');
+  const mobileStockCount = availableMobiles.length;
+  
+  const accessoryStockCount = accessories.reduce((sum, a) => sum + (a.quantity || 0), 0);
+
+  // Stock Valuation
+  const mobileStockCost = availableMobiles.reduce((sum, m) => sum + (parseFloat(m.purchasePrice) || 0), 0);
+  const mobileStockSaleValue = availableMobiles.reduce((sum, m) => sum + (parseFloat(m.sellingPrice) || 0), 0);
+
+  const accessoryStockCost = accessories.reduce((sum, a) => sum + ((parseFloat(a.purchasePrice) || 0) * (parseInt(a.quantity) || 0)), 0);
+  const accessoryStockSaleValue = accessories.reduce((sum, a) => sum + ((parseFloat(a.sellingPrice) || 0) * (parseInt(a.quantity) || 0)), 0);
+
+  const totalStockCost = mobileStockCost + accessoryStockCost;
+  const totalStockSaleValue = mobileStockSaleValue + accessoryStockSaleValue;
+
+  // Sales Analytics
+  const today = new Date().toDateString();
+  let totalRevenue = 0;
+  let totalProfit = 0;
+  let todayRevenue = 0;
+  let todayProfit = 0;
+  let soldToday = 0;
+
+  sales.forEach(s => {
+    const amount = (s.totalAmount || s.salePrice || 0);
+    const profit = (s.totalProfit || s.profit || 0);
+    totalRevenue += amount;
+    totalProfit += profit;
+    
+    if (new Date(s.soldAt).toDateString() === today) {
+       todayRevenue += amount;
+       todayProfit += profit;
+       if (s.items) {
+         s.items.forEach(item => soldToday += item.qty);
+       } else {
+         soldToday += 1;
+       }
+    }
+  });
+
+  const recentSales = sales.slice(0, 5);
+
+  const brands = availableMobiles.reduce((acc, m) => {
+    if (!acc[m.brand]) {
+      acc[m.brand] = { count: 0, cost: 0, sellingValue: 0 };
+    }
+    acc[m.brand].count += 1;
+    acc[m.brand].cost += parseFloat(m.purchasePrice) || 0;
+    acc[m.brand].sellingValue += parseFloat(m.sellingPrice) || 0;
+    return acc;
+  }, {});
+  
+  const distributionData = Object.keys(brands).map(name => ({
+    name,
+    value: brands[name].count,
+    cost: brands[name].cost,
+    sellingValue: brands[name].sellingValue
+  }));
+  const finalDistributionData = distributionData.length > 0 
+    ? distributionData 
+    : [{ name: 'No Stock', value: 0, cost: 0, sellingValue: 0 }];
+
+  const CustomTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      if (data.name === 'No Stock') return null;
+      return (
+        <div className="bg-slate-900 border border-slate-700 p-3 rounded-lg shadow-xl text-xs space-y-1">
+          <p className="font-bold text-white uppercase">{data.name}</p>
+          <p className="text-slate-400">Stock: <span className="text-white font-semibold">{data.value} Unit(s)</span></p>
+          <p className="text-slate-400">Selling Value: <span className="text-emerald-400 font-bold">Rs. {data.sellingValue.toLocaleString()}</span></p>
+          {isAdmin && (
+            <p className="text-slate-400">Cost Value: <span className="text-rose-400 font-bold">Rs. {data.cost.toLocaleString()}</span></p>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
 
   if (loading) {
     return (
@@ -132,16 +201,22 @@ export default function Dashboard() {
         <p className="text-slate-400 text-sm">Real-time inventory & sales intelligence.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Mobile Stock" value={`${stats.mobileStock} Units`} icon={Package} color="primary" />
-        <StatCard title="Accessory Items" value={`${stats.accessoryStock} Items`} icon={PackageCheck} color="indigo" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <StatCard title="Mobile Stock" value={`${mobileStockCount} Units`} icon={Package} color="primary" />
+        <StatCard title="Accessory Items" value={`${accessoryStockCount} Items`} icon={PackageCheck} color="indigo" />
+        {isAdmin && (
+          <StatCard title="Stock Value (Cost)" value={`Rs. ${totalStockCost.toLocaleString()}`} icon={DollarSign} color="rose" />
+        )}
+        <StatCard title="Stock Value (Selling)" value={`Rs. ${totalStockSaleValue.toLocaleString()}`} icon={TrendingUp} color="emerald" />
+        
         {isAdmin && (
           <>
-            <StatCard title="Total Revenue" value={`Rs. ${stats.totalRevenue.toLocaleString()}`} icon={TrendingUp} color="amber" />
-            <StatCard title="Today's Profit" value={`Rs. ${stats.totalProfit.toLocaleString()}`} icon={DollarSign} color="emerald" />
+            <StatCard title="Total Revenue" value={`Rs. ${totalRevenue.toLocaleString()}`} icon={TrendingUp} color="amber" />
+            <StatCard title="Today's Profit" value={`Rs. ${todayProfit.toLocaleString()}`} icon={DollarSign} color="emerald" />
+            <StatCard title="Total Profit" value={`Rs. ${totalProfit.toLocaleString()}`} icon={DollarSign} color="teal" />
           </>
         )}
-        {!isAdmin && <StatCard title="Sold Today" value={`${stats.soldToday} Units`} icon={ShoppingCart} color="emerald" />}
+        {!isAdmin && <StatCard title="Sold Today" value={`${soldToday} Units`} icon={ShoppingCart} color="emerald" />}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -161,7 +236,7 @@ export default function Dashboard() {
                         <p className="text-sm font-bold text-white">
                           {sale.items ? `${sale.items.length} item(s)` : `${sale.brand} ${sale.model}`}
                         </p>
-                        <p className="text-[10px] text-slate-500">{new Date(sale.soldAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {sale.customerName || 'Walk-in'}</p>
+                        <p className="text-[10px] text-slate-500">{formatSaleDate(sale.soldAt)} · {sale.customerName || 'Walk-in'}</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -179,23 +254,25 @@ export default function Dashboard() {
           <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={distributionData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                  {distributionData.map((entry, index) => (
+                <Pie data={finalDistributionData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                  {finalDistributionData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }} />
+                <Tooltip content={<CustomTooltip />} />
               </PieChart>
             </ResponsiveContainer>
           </div>
           <div className="mt-4 space-y-2 max-h-40 overflow-y-auto pr-2">
-            {distributionData.map((brand, i) => (
+            {finalDistributionData.map((brand, i) => (
               <div key={brand.name} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2 text-slate-400">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                   {brand.name}
                 </div>
-                <span className="text-white font-medium">{brand.value}</span>
+                <span className="text-white font-medium">
+                  {brand.value} {brand.value === 1 ? 'Unit' : 'Units'} {brand.name !== 'No Stock' && `(Rs. ${brand.sellingValue.toLocaleString()})`}
+                </span>
               </div>
             ))}
           </div>
