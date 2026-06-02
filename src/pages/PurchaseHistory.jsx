@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { generatePurchasePdf } from '../utils/pdfGenerator.js?v=3';
-import { X, FileDown, Package } from 'lucide-react';
+import { X, FileDown, Package, Edit, Trash2, Save } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 function formatTs(ts) {
   if (ts?.seconds) return new Date(ts.seconds * 1000).toLocaleString();
@@ -17,6 +18,19 @@ export default function PurchaseHistory() {
   const [supplierMap, setSupplierMap] = useState({}); // { supplierId: supplierName }
   const [selectedPurchase, setSelectedPurchase] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [editingPurchase, setEditingPurchase] = useState(null);
+  const [editForm, setEditForm] = useState({
+    brand: '',
+    model: '',
+    imei1: '',
+    imei2: '',
+    storage: '',
+    color: '',
+    supplierId: '',
+    purchasePrice: 0,
+    sellingPrice: 0,
+    status: 'Available'
+  });
 
   // Fetch suppliers once to build lookup map
   useEffect(() => {
@@ -62,8 +76,60 @@ export default function PurchaseHistory() {
     generatePurchasePdf(purchaseObj);
   };
 
+  const handleDeletePurchase = async (item) => {
+    if (!window.confirm(`Are you sure you want to delete the purchase record of ${item.brand} ${item.model}? This will remove it from inventory.`)) return;
+    try {
+      await deleteDoc(doc(db, 'mobiles', item.id));
+      toast.success("Purchase record and mobile device deleted from inventory!");
+    } catch (error) {
+      console.error("Error deleting purchase:", error);
+      toast.error("Failed to delete purchase: " + error.message);
+    }
+  };
+
+  const startEdit = (item) => {
+    setEditingPurchase(item);
+    setEditForm({
+      brand: item.brand || '',
+      model: item.model || '',
+      imei1: item.imei1 || '',
+      imei2: item.imei2 || '',
+      storage: item.storage || '',
+      color: item.color || '',
+      supplierId: item.supplierId || '',
+      purchasePrice: item.purchasePrice || 0,
+      sellingPrice: item.sellingPrice || 0,
+      status: item.status || 'Available'
+    });
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    try {
+      const mobileRef = doc(db, 'mobiles', editingPurchase.id);
+      await updateDoc(mobileRef, {
+        brand: editForm.brand,
+        model: editForm.model,
+        imei1: editForm.imei1,
+        imei2: editForm.imei2,
+        storage: editForm.storage,
+        color: editForm.color,
+        supplierId: editForm.supplierId,
+        purchasePrice: parseFloat(editForm.purchasePrice) || 0,
+        sellingPrice: parseFloat(editForm.sellingPrice) || 0,
+        status: editForm.status,
+        updatedAt: new Date().toISOString()
+      });
+      toast.success("Purchase and mobile details updated successfully!");
+      setEditingPurchase(null);
+    } catch (error) {
+      console.error("Error updating purchase:", error);
+      toast.error("Failed to update purchase.");
+    }
+  };
+
   return (
-    <div className="p-6 min-h-screen" style={{ background: '#0f172a' }}>
+    <div className="p-6 min-h-screen text-slate-100 font-sans" style={{ background: '#0f172a' }}>
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center">
@@ -89,6 +155,7 @@ export default function PurchaseHistory() {
                 <th className="px-4 py-3 text-left">Supplier</th>
                 <th className="px-4 py-3 text-left">Cost</th>
                 <th className="px-4 py-3 text-left">Status</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -115,6 +182,22 @@ export default function PurchaseHistory() {
                     }`}>
                       {item.status || 'unknown'}
                     </span>
+                  </td>
+                  <td className="px-4 py-3 text-right space-x-2" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => startEdit(item)}
+                      className="p-1.5 hover:bg-slate-700 rounded-lg text-primary-400 inline-flex items-center transition-colors"
+                      title="Edit Purchase"
+                    >
+                      <Edit className="w-4.5 h-4.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeletePurchase(item)}
+                      className="p-1.5 hover:bg-slate-700 rounded-lg text-rose-400 inline-flex items-center transition-colors"
+                      title="Delete Purchase"
+                    >
+                      <Trash2 className="w-4.5 h-4.5" />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -173,6 +256,133 @@ export default function PurchaseHistory() {
               <FileDown className="w-4 h-4" />
               Download PDF Invoice
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingPurchase && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-50 p-4">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-2xl p-6 relative shadow-2xl">
+            <button
+              onClick={() => setEditingPurchase(null)}
+              className="absolute top-4 right-4 p-1.5 hover:bg-slate-700 rounded-lg text-slate-400 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <Edit className="w-5 h-5 text-primary-400" /> Edit Purchase details
+            </h2>
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Brand</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={editForm.brand}
+                    onChange={(e) => setEditForm({ ...editForm, brand: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Model</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={editForm.model}
+                    onChange={(e) => setEditForm({ ...editForm, model: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">IMEI 1</label>
+                  <input
+                    type="text"
+                    className="input-field font-mono"
+                    value={editForm.imei1}
+                    onChange={(e) => setEditForm({ ...editForm, imei1: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">IMEI 2 (Optional)</label>
+                  <input
+                    type="text"
+                    className="input-field font-mono"
+                    value={editForm.imei2}
+                    onChange={(e) => setEditForm({ ...editForm, imei2: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Storage</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={editForm.storage}
+                    onChange={(e) => setEditForm({ ...editForm, storage: e.target.value })}
+                    placeholder="e.g. 128GB / 256GB"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Color</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={editForm.color}
+                    onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Supplier</label>
+                  <select
+                    className="input-field"
+                    value={editForm.supplierId}
+                    onChange={(e) => setEditForm({ ...editForm, supplierId: e.target.value })}
+                  >
+                    <option value="">Select Supplier</option>
+                    {Object.entries(supplierMap).map(([id, name]) => (
+                      <option key={id} value={id}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Status</label>
+                  <select
+                    className="input-field"
+                    value={editForm.status}
+                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                  >
+                    <option value="Available">Available</option>
+                    <option value="Sold">Sold</option>
+                    <option value="Returned">Returned</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Purchase Cost (Rs.)</label>
+                  <input
+                    type="number"
+                    className="input-field"
+                    value={editForm.purchasePrice}
+                    onChange={(e) => setEditForm({ ...editForm, purchasePrice: e.target.value })}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Selling Price (Rs.)</label>
+                  <input
+                    type="number"
+                    className="input-field"
+                    value={editForm.sellingPrice}
+                    onChange={(e) => setEditForm({ ...editForm, sellingPrice: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+              <button type="submit" className="btn-primary w-full py-3 flex items-center justify-center gap-2 mt-4 font-bold">
+                <Save className="w-4 h-4" /> Save Changes
+              </button>
+            </form>
           </div>
         </div>
       )}

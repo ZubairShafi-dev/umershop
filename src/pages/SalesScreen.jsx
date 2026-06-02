@@ -39,9 +39,10 @@ const PrintableReceipt = React.forwardRef(({ sale, customerInfo, shopSettings },
   return (
     <div ref={ref} className="p-8 bg-white text-black font-sans w-[80mm] mx-auto text-[12px]">
       <div className="text-center border-b border-black pb-4 mb-4">
-        <h2 className="text-xl font-black uppercase tracking-tighter">{shopSettings?.name || 'Umar Mobile'}</h2>
-        <p className="text-[10px] font-bold">{shopSettings?.address || 'Main Market, Near Clock Tower'}</p>
-        <p className="text-[10px]">Contact: {shopSettings?.phone || '0300-1234567'}</p>
+        <h2 className="text-xl font-black uppercase tracking-tighter">{shopSettings?.name || 'Umar Mobile & Accessories'}</h2>
+        {shopSettings?.ownerName && <p className="text-[10px] font-bold">Proprietor: {shopSettings.ownerName}</p>}
+        <p className="text-[10px] font-bold">{shopSettings?.address || 'Main Bazaar, Near Clock Tower'}</p>
+        <p className="text-[10px]">Contact: {shopSettings?.phone || '+92 300 6317013'}</p>
       </div>
 
       <div className="mb-4 space-y-1 border-b border-black pb-2">
@@ -93,9 +94,10 @@ const PrintableReceipt = React.forwardRef(({ sale, customerInfo, shopSettings },
 export default function SalesScreen() {
   const { currentUser } = useAuth();
   const [shopSettings, setShopSettings] = useState({
-    name: 'Umar Mobile',
-    phone: '0300-1234567',
-    address: 'Main Market, Near Clock Tower'
+    name: 'Umar Mobile & Accessories',
+    ownerName: 'Umar Shafi',
+    phone: '+92 300 6317013',
+    address: 'Main Bazaar, Near Clock Tower'
   });
 
   useEffect(() => {
@@ -106,9 +108,10 @@ export default function SalesScreen() {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setShopSettings({
-            name: data.name || 'Umar Mobile',
-            phone: data.phone || '0300-1234567',
-            address: data.address || 'Main Market, Near Clock Tower'
+            name: data.name || 'Umar Mobile & Accessories',
+            ownerName: data.ownerName || 'Umar Shafi',
+            phone: data.phone || '+92 300 6317013',
+            address: data.address || 'Main Bazaar, Near Clock Tower'
           });
         }
       } catch (err) {

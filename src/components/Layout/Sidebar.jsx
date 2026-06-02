@@ -30,11 +30,11 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Sales', path: '/sales', icon: ShoppingCart },
     { name: 'Sales History', path: '/sales-history', icon: ShoppingCart },
     ...(isAdmin ? [
+      { name: 'Purchase History', path: '/purchase-history', icon: Package },
       { name: 'Suppliers', path: '/suppliers', icon: Users },
       { name: 'Reports', path: '/reports', icon: BarChart3 },
       { name: 'Expenses', path: '/expenses', icon: CreditCard },
       { name: 'Installments', path: '/installments', icon: CalendarDays },
-      { name: 'Purchase History', path: '/purchase-history', icon: Package },
     ] : []),
     { name: 'Settings', path: '/settings', icon: Settings },
   ];

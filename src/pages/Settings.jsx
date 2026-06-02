@@ -33,7 +33,7 @@ export default function Settings() {
         const docRef = doc(db, 'settings', 'shop');
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setShopInfo(docSnap.data());
+          setShopInfo(prev => ({ ...prev, ...docSnap.data() }));
         }
       } catch (err) {
         console.error("Error loading settings:", err);
