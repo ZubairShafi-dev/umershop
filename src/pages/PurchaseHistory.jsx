@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
 import { generatePurchasePdf } from '../utils/pdfGenerator';
 import { X, FileDown, Package } from 'lucide-react';
@@ -7,17 +7,30 @@ import { X, FileDown, Package } from 'lucide-react';
 function formatTs(ts) {
   if (ts?.seconds) return new Date(ts.seconds * 1000).toLocaleString();
   if (ts?.toDate) return ts.toDate().toLocaleString();
+  // Handle ISO string from Suppliers (createdAt stored as string in some docs)
+  if (typeof ts === 'string') return new Date(ts).toLocaleString();
   return '—';
 }
 
 export default function PurchaseHistory() {
   const [purchases, setPurchases] = useState([]);
+  const [supplierMap, setSupplierMap] = useState({}); // { supplierId: supplierName }
   const [selectedPurchase, setSelectedPurchase] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Fetch suppliers once to build lookup map
   useEffect(() => {
-    // Listen to 'mobiles' collection filtered by those with purchaseDate as a proxy
-    // for purchase history — real purchases stored in 'mobiles' collection
+    getDocs(collection(db, 'suppliers')).then((snap) => {
+      const map = {};
+      snap.docs.forEach((d) => {
+        map[d.id] = d.data().name || d.id;
+      });
+      setSupplierMap(map);
+    });
+  }, []);
+
+  // Real-time listener on mobiles
+  useEffect(() => {
     const q = query(collection(db, 'mobiles'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
@@ -27,15 +40,17 @@ export default function PurchaseHistory() {
     return () => unsubscribe();
   }, []);
 
+  const getSupplierName = (item) =>
+    supplierMap[item.supplierId] || item.supplierName || item.supplierId || '—';
+
   const openModal = (purchase) => setSelectedPurchase(purchase);
   const closeModal = () => setSelectedPurchase(null);
 
   const handleDownloadPdf = () => {
     if (!selectedPurchase) return;
-    // Build a purchase-like object compatible with pdfGenerator
     const purchaseObj = {
       id: selectedPurchase.id,
-      supplierName: selectedPurchase.supplierName || selectedPurchase.supplierId || 'N/A',
+      supplierName: getSupplierName(selectedPurchase),
       purchasedAt: selectedPurchase.createdAt,
       totalCost: selectedPurchase.purchasePrice,
       items: [{
@@ -86,7 +101,7 @@ export default function PurchaseHistory() {
                   <td className="px-4 py-3 text-slate-300">{formatTs(item.createdAt)}</td>
                   <td className="px-4 py-3 text-white font-medium">{item.brand} {item.model}</td>
                   <td className="px-4 py-3 text-slate-400 font-mono text-xs">{item.imei1 || '—'}</td>
-                  <td className="px-4 py-3 text-slate-300">{item.supplierName || item.supplierId || '—'}</td>
+                  <td className="px-4 py-3 text-slate-300 font-medium">{getSupplierName(item)}</td>
                   <td className="px-4 py-3 text-emerald-400 font-semibold">
                     Rs. {item.purchasePrice?.toLocaleString() ?? '—'}
                   </td>
@@ -137,7 +152,7 @@ export default function PurchaseHistory() {
                 ['IMEI 2', selectedPurchase.imei2 || '—'],
                 ['Storage', selectedPurchase.storage || '—'],
                 ['Color', selectedPurchase.color || '—'],
-                ['Supplier', selectedPurchase.supplierName || selectedPurchase.supplierId || '—'],
+                ['Supplier', getSupplierName(selectedPurchase)],
                 ['Purchase Date', formatTs(selectedPurchase.createdAt)],
                 ['Purchase Cost', `Rs. ${selectedPurchase.purchasePrice?.toLocaleString() ?? '—'}`],
                 ['Selling Price', `Rs. ${selectedPurchase.sellingPrice?.toLocaleString() ?? '—'}`],

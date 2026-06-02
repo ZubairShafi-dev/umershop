@@ -19,6 +19,7 @@ export function generateSalePdf(sale) {
   doc.setFontSize(11);
   doc.setTextColor(80, 80, 80);
   doc.text(`Date: ${formatTimestamp(sale.soldAt)}`, 14, 32);
+  doc.text('Contact: 0300-6317013', 14, 40);
   doc.text(`Customer: ${sale.customerName || 'N/A'}`, 14, 40);
 
   // Items table
