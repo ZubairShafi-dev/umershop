@@ -28,11 +28,13 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Inventory', path: '/inventory', icon: Smartphone },
     { name: 'IMEI Search', path: '/search', icon: Scan },
     { name: 'Sales', path: '/sales', icon: ShoppingCart },
+    { name: 'Sales History', path: '/sales-history', icon: ShoppingCart },
     ...(isAdmin ? [
       { name: 'Suppliers', path: '/suppliers', icon: Users },
       { name: 'Reports', path: '/reports', icon: BarChart3 },
       { name: 'Expenses', path: '/expenses', icon: CreditCard },
       { name: 'Installments', path: '/installments', icon: CalendarDays },
+      { name: 'Purchase History', path: '/purchase-history', icon: Package },
     ] : []),
     { name: 'Settings', path: '/settings', icon: Settings },
   ];

@@ -17,6 +17,8 @@ import Settings from './pages/Settings';
 import Accessories from './pages/Accessories';
 import Expenses from './pages/Expenses';
 import Installments from './pages/Installments';
+import SalesHistory from './pages/SalesHistory';
+import PurchaseHistory from './pages/PurchaseHistory';
 
 
 // Change to true to manually activate the suspension screen,
@@ -65,6 +67,8 @@ function App() {
             <Route path="inventory" element={<Inventory />} />
             <Route path="search" element={<IMEISearch />} />
             <Route path="sales" element={<SalesScreen />} />
+            <Route path="sales-history" element={<SalesHistory />} />
+            <Route path="purchase-history" element={<PurchaseHistory />} />
             <Route path="suppliers" element={<Suppliers />} />
             <Route path="reports" element={<Reports />} />
             <Route path="accessories" element={<Accessories />} />
