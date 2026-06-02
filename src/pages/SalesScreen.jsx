@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, doc, updateDoc, addDoc, or, runTransaction, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, addDoc, or, runTransaction, orderBy, getDoc } from 'firebase/firestore';
 import { 
   ShoppingCart, 
   Scan, 
@@ -31,7 +31,7 @@ import { useReactToPrint } from 'react-to-print';
 import toast from 'react-hot-toast';
 
 // Printable Receipt Component
-const PrintableReceipt = React.forwardRef(({ sale, customerInfo }, ref) => {
+const PrintableReceipt = React.forwardRef(({ sale, customerInfo, shopSettings }, ref) => {
   if (!sale) return null;
   const today = new Date().toLocaleDateString('en-PK');
   const time = new Date().toLocaleTimeString('en-PK');
@@ -39,9 +39,9 @@ const PrintableReceipt = React.forwardRef(({ sale, customerInfo }, ref) => {
   return (
     <div ref={ref} className="p-8 bg-white text-black font-sans w-[80mm] mx-auto text-[12px]">
       <div className="text-center border-b border-black pb-4 mb-4">
-        <h2 className="text-xl font-black uppercase tracking-tighter">Umar Mobile</h2>
-        <p className="text-[10px] font-bold">Main Market, Near Clock Tower</p>
-        <p className="text-[10px]">Contact: 0300-1234567</p>
+        <h2 className="text-xl font-black uppercase tracking-tighter">{shopSettings?.name || 'Umar Mobile'}</h2>
+        <p className="text-[10px] font-bold">{shopSettings?.address || 'Main Market, Near Clock Tower'}</p>
+        <p className="text-[10px]">Contact: {shopSettings?.phone || '0300-1234567'}</p>
       </div>
 
       <div className="mb-4 space-y-1 border-b border-black pb-2">
@@ -92,6 +92,32 @@ const PrintableReceipt = React.forwardRef(({ sale, customerInfo }, ref) => {
 
 export default function SalesScreen() {
   const { currentUser } = useAuth();
+  const [shopSettings, setShopSettings] = useState({
+    name: 'Umar Mobile',
+    phone: '0300-1234567',
+    address: 'Main Market, Near Clock Tower'
+  });
+
+  useEffect(() => {
+    async function loadShopSettings() {
+      try {
+        const docRef = doc(db, 'settings', 'shop');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setShopSettings({
+            name: data.name || 'Umar Mobile',
+            phone: data.phone || '0300-1234567',
+            address: data.address || 'Main Market, Near Clock Tower'
+          });
+        }
+      } catch (err) {
+        console.error("Error loading shop settings for checkout print:", err);
+      }
+    }
+    loadShopSettings();
+  }, []);
+
   const [scanValue, setScanValue] = useState('');
   const [searching, setSearching] = useState(false);
   const [cart, setCart] = useState([]);
@@ -344,7 +370,7 @@ export default function SalesScreen() {
 
         {/* Hidden Printable Receipt */}
         <div className="hidden">
-          <PrintableReceipt ref={receiptRef} sale={completedSaleData} customerInfo={customerInfo} />
+          <PrintableReceipt ref={receiptRef} sale={completedSaleData} customerInfo={customerInfo} shopSettings={shopSettings} />
         </div>
       </div>
     );
@@ -580,7 +606,7 @@ export default function SalesScreen() {
 
       {/* Hidden Printable Receipt for in-progress print */}
       <div className="hidden">
-        <PrintableReceipt ref={receiptRef} sale={completedSaleData} customerInfo={customerInfo} />
+        <PrintableReceipt ref={receiptRef} sale={completedSaleData} customerInfo={customerInfo} shopSettings={shopSettings} />
       </div>
     </div>
   );

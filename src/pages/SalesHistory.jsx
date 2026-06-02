@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
-import { generateSalePdf } from '../utils/pdfGenerator';
+import { generateSalePdf } from '../utils/pdfGenerator.js?v=3';
 import { X } from 'lucide-react';
 
 export default function SalesHistory() {
@@ -43,7 +43,7 @@ export default function SalesHistory() {
             <tr>
               <th className="p-3 text-left">Date</th>
               <th className="p-3 text-left">Customer</th>
-              <th className="p-3 text-left">Items</th>
+              <th className="p-3 text-left">Items (Qty)</th>
               <th className="p-3 text-left">Total</th>
               <th className="p-3 text-left">Profit</th>
             </tr>
@@ -57,12 +57,16 @@ export default function SalesHistory() {
               >
                 <td className="p-3">
                   {sale.soldAt?.seconds
-                    ? new Date(sale.soldAt.seconds * 1000).toLocaleDateString()
+                    ? new Date(sale.soldAt.seconds * 1000).toLocaleString('en-PK')
+                    : typeof sale.soldAt === 'string'
+                    ? new Date(sale.soldAt).toLocaleString('en-PK')
                     : '—'}
                 </td>
                 <td className="p-3">{sale.customerName || '—'}</td>
-                <td className="p-3">{sale.items?.length || 0}</td>
-                <td className="p-3">Rs. {sale.totalPrice?.toLocaleString() ?? '—'}</td>
+                <td className="p-3">
+                  {sale.items?.reduce((sum, item) => sum + (item.qty || 1), 0) || 0}
+                </td>
+                <td className="p-3">Rs. {sale.totalAmount?.toLocaleString() ?? '—'}</td>
                 <td className="p-3">Rs. {sale.totalProfit?.toLocaleString() ?? '—'}</td>
               </tr>
             ))}
@@ -105,7 +109,7 @@ export default function SalesHistory() {
                 </tbody>
               </table>
             </div>
-            <p className="mt-4"><strong>Total:</strong> Rs. {selectedSale.totalPrice?.toLocaleString()}</p>
+            <p className="mt-4"><strong>Total:</strong> Rs. {selectedSale.totalAmount?.toLocaleString()}</p>
             <p className="mb-4"><strong>Profit:</strong> Rs. {selectedSale.totalProfit?.toLocaleString()}</p>
             <button
               onClick={handleDownloadPdf}
@@ -122,7 +126,10 @@ export default function SalesHistory() {
 
 function saleDate(sale) {
   if (sale.soldAt?.seconds) {
-    return new Date(sale.soldAt.seconds * 1000).toLocaleString();
+    return new Date(sale.soldAt.seconds * 1000).toLocaleString('en-PK');
+  }
+  if (typeof sale.soldAt === 'string') {
+    return new Date(sale.soldAt).toLocaleString('en-PK');
   }
   return '—';
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   Settings as SettingsIcon, 
@@ -6,26 +6,54 @@ import {
   Shield, 
   LogOut, 
   Save, 
-  Globe, 
-  Phone, 
   Mail,
-  Smartphone
+  Smartphone,
+  MapPin,
+  UserCheck
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export default function Settings() {
   const { currentUser, userRole, logout } = useAuth();
   const [shopInfo, setShopInfo] = useState({
     name: 'Umar Mobile & Accessories',
-    address: 'Main Bazaar, City Name',
-    phone: '+92 300 1234567',
-    currency: 'PKR',
+    ownerName: 'Umar Shafi',
+    address: 'Main Bazaar, Near Clock Tower',
+    phone: '+92 300 6317013',
+    currency: 'PKR (Rs.)',
     language: 'English'
   });
+  const [loading, setLoading] = useState(true);
 
-  const handleSaveShop = (e) => {
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const docRef = doc(db, 'settings', 'shop');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setShopInfo(docSnap.data());
+        }
+      } catch (err) {
+        console.error("Error loading settings:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadSettings();
+  }, []);
+
+  const handleSaveShop = async (e) => {
     e.preventDefault();
-    toast.success("Shop information updated!");
+    try {
+      const docRef = doc(db, 'settings', 'shop');
+      await setDoc(docRef, shopInfo);
+      toast.success("Shop settings updated successfully!");
+    } catch (err) {
+      console.error("Error saving settings:", err);
+      toast.error("Failed to save shop info.");
+    }
   };
 
   return (
@@ -104,6 +132,16 @@ export default function Settings() {
                   />
                 </div>
                 <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Owner Name</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={shopInfo.ownerName || ''}
+                    onChange={(e) => setShopInfo({...shopInfo, ownerName: e.target.value})}
+                    placeholder="e.g. Umar Shafi"
+                  />
+                </div>
+                <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Phone Number</label>
                   <input
                     type="tel"
@@ -112,16 +150,30 @@ export default function Settings() {
                     onChange={(e) => setShopInfo({...shopInfo, phone: e.target.value})}
                   />
                 </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Shop Address</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={shopInfo.address || ''}
+                    onChange={(e) => setShopInfo({...shopInfo, address: e.target.value})}
+                    placeholder="e.g. Main Bazaar, Near Clock Tower"
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Currency</label>
-                  <select className="input-field">
+                  <select 
+                    className="input-field"
+                    value={shopInfo.currency || 'PKR (Rs.)'}
+                    onChange={(e) => setShopInfo({...shopInfo, currency: e.target.value})}
+                  >
                     <option>PKR (Rs.)</option>
                     <option>USD ($)</option>
                   </select>
                 </div>
               </div>
               
-              <button type="submit" className="btn-primary w-full py-3 flex items-center justify-center gap-2">
+              <button type="submit" className="btn-primary w-full py-3 flex items-center justify-center gap-2 mt-4">
                 <Save className="w-4 h-4" />
                 Save Changes
               </button>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
-import { generatePurchasePdf } from '../utils/pdfGenerator';
+import { generatePurchasePdf } from '../utils/pdfGenerator.js?v=3';
 import { X, FileDown, Package } from 'lucide-react';
 
 function formatTs(ts) {
@@ -107,9 +107,9 @@ export default function PurchaseHistory() {
                   </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                      item.status === 'available'
+                      item.status?.toLowerCase() === 'available'
                         ? 'bg-emerald-500/20 text-emerald-400'
-                        : item.status === 'sold'
+                        : item.status?.toLowerCase() === 'sold'
                         ? 'bg-slate-500/20 text-slate-400'
                         : 'bg-amber-500/20 text-amber-400'
                     }`}>
